@@ -1,0 +1,151 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+:root {
+  --c-accent: #f27d26;
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Anton", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-bg: #050505;
+  --color-ink: #ffffff;
+  --color-accent: var(--c-accent);
+  --color-danger: #ff4444;
+  --color-success: #00ff00;
+  --color-info: #3b82f6;
+  --color-warning: #ef4444;
+  --color-notify: #f97316;
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-ink font-sans antialiased selection:bg-accent selection:text-bg transition-colors duration-500;
+  }
+
+  h1, h2, h3 {
+    @apply font-display uppercase tracking-tight;
+  }
+}
+
+/* Font Sizes */
+.text-small { font-size: 14px; }
+.text-medium { font-size: 16px; }
+.text-large { font-size: 18px; }
+
+/* Light Theme Support */
+.light {
+  --color-bg: #f5f5f5;
+  --color-ink: #050505;
+}
+
+.light .vonas-card {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #050505;
+}
+
+.light .vonas-input {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #050505;
+}
+
+.light .text-white { color: #050505; }
+.light .text-white\/40 { color: rgba(0, 0, 0, 0.4); }
+.light .text-white\/20 { color: rgba(0, 0, 0, 0.2); }
+.light .text-white\/10 { color: rgba(0, 0, 0, 0.1); }
+.light .text-white\/5 { color: rgba(0, 0, 0, 0.05); }
+.light .bg-white\/5 { background-color: rgba(0, 0, 0, 0.05); }
+.light .bg-white\/10 { background-color: rgba(0, 0, 0, 0.1); }
+.light .border-white\/10 { border-color: rgba(0, 0, 0, 0.1); }
+.light .border-white\/20 { border-color: rgba(0, 0, 0, 0.2); }
+
+.light .text-stroke {
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.2);
+}
+
+.light .text-stroke:hover {
+  -webkit-text-stroke: 1px var(--c-accent);
+}
+
+.light ::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: #ccc;
+}
+
+@layer components {
+  .vonas-card {
+    @apply bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm transition-all duration-300 hover:border-accent/50;
+  }
+
+  .vonas-button {
+    @apply px-6 py-3 rounded-full font-display uppercase tracking-wider transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2;
+  }
+
+  .vonas-button-primary {
+    @apply bg-accent text-bg hover:scale-105 active:scale-95;
+  }
+
+  .vonas-button-outline {
+    @apply border border-white/20 text-ink hover:bg-white/10;
+  }
+
+  .vonas-input {
+    @apply bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-accent outline-none transition-all;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 1.5rem);
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .text-stroke {
+    -webkit-text-stroke: 1px rgba(255, 255, 255, 0.2);
+    color: transparent;
+  }
+
+  .text-stroke:hover {
+    -webkit-text-stroke: 1px var(--color-accent);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #f27d26;
+}
+
+@keyframes slamIn {
+  0% { transform: scale(1.5) translateY(50px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.animate-slam {
+  animation: slamIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

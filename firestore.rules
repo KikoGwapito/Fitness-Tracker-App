@@ -1,0 +1,159 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - email: string (required)
+    //   - name: string (optional)
+    //   - username: string (optional)
+    //   - profile_picture: string (optional)
+    //   - age: number (optional)
+    //   - gender: string (optional)
+    //   - weight_kg: number (optional)
+    //   - height_cm: number (optional)
+    //   - activity_level: string (optional)
+    //   - goal: string (optional)
+    //   - daily_goals: map (required)
+    //     - calories: number (required)
+    //     - protein_g: number (required)
+    //     - carbs_g: number (required)
+    //     - fat_g: number (required)
+    //     - sugar_g: number (required)
+    //     - sodium_mg: number (required)
+    //   - bmr: number (optional)
+    //   - created_at: number (required, immutable)
+    //
+    // Collection: users/{userId}/food_logs
+    // Document ID: {logId}
+    // Fields:
+    //   - userId: string (required, immutable)
+    //   - timestamp: timestamp (required)
+    //   - foodName: string (required)
+    //   - macros: map (required)
+    //     - calories: number (required)
+    //     - protein: number (required)
+    //     - carbs: number (required)
+    //     - fat: number (required)
+    //   - sugar_g: number (required)
+    //   - sodium_mg: number (required)
+    //   - health_score: number (required)
+    //   - coach_tip: string (required)
+    //   - image_url: string (optional)
+    //   - isValidated: boolean (required)
+    //   - status: string (optional)
+    //   - clarification_required: string (optional)
+    //   - reason: string (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidDailyGoals(goals) {
+      return goals is map &&
+             goals.keys().hasAll(['calories', 'protein_g', 'carbs_g', 'fat_g', 'sugar_g', 'sodium_mg']) &&
+             goals.calories is number && goals.calories >= 0 &&
+             goals.protein_g is number && goals.protein_g >= 0 &&
+             goals.carbs_g is number && goals.carbs_g >= 0 &&
+             goals.fat_g is number && goals.fat_g >= 0 &&
+             goals.sugar_g is number && goals.sugar_g >= 0 &&
+             goals.sodium_mg is number && goals.sodium_mg >= 0;
+    }
+
+    function isValidUser() {
+      let data = request.resource.data;
+      return hasRequiredFields(['email', 'daily_goals', 'created_at']) &&
+             isValidEmail(data.email) &&
+             isValidDailyGoals(data.daily_goals) &&
+             data.created_at is number &&
+             (!('name' in data) || (data.name is string && data.name.size() <= 100)) &&
+             (!('username' in data) || (data.username is string && data.username.size() <= 50)) &&
+             (!('profile_picture' in data) || (data.profile_picture is string && data.profile_picture.size() <= 1048576)) &&
+             (!('age' in data) || (data.age is number && data.age >= 0 && data.age <= 150)) &&
+             (!('gender' in data) || (data.gender in ['male', 'female'])) &&
+             (!('weight_kg' in data) || (data.weight_kg is number && data.weight_kg > 0)) &&
+             (!('height_cm' in data) || (data.height_cm is number && data.height_cm > 0)) &&
+             (!('activity_level' in data) || (data.activity_level in ['sedentary', 'light', 'moderate', 'active', 'very_active'])) &&
+             (!('goal' in data) || (data.goal in ['lose', 'maintain', 'gain'])) &&
+             (!('bmr' in data) || (data.bmr is number && data.bmr > 0));
+    }
+
+    function isValidFoodLog() {
+      let data = request.resource.data;
+      return hasRequiredFields(['userId', 'timestamp', 'foodName', 'macros', 'sugar_g', 'sodium_mg', 'health_score', 'coach_tip', 'isValidated']) &&
+             data.userId == request.auth.uid &&
+             data.timestamp is timestamp &&
+             data.foodName is string && data.foodName.size() > 0 && data.foodName.size() <= 200 &&
+             data.macros is map &&
+             data.macros.keys().hasAll(['calories', 'protein', 'carbs', 'fat']) &&
+             data.macros.calories is number && data.macros.calories >= 0 &&
+             data.macros.protein is number && data.macros.protein >= 0 &&
+             data.macros.carbs is number && data.macros.carbs >= 0 &&
+             data.macros.fat is number && data.macros.fat >= 0 &&
+             data.sugar_g is number && data.sugar_g >= 0 &&
+             data.sodium_mg is number && data.sodium_mg >= 0 &&
+             data.health_score is number && data.health_score >= 0 && data.health_score <= 10 &&
+             data.coach_tip is string && data.coach_tip.size() <= 1000 &&
+             data.isValidated is bool &&
+             (!('image_url' in data) || (data.image_url is string && data.image_url.size() <= 2048)) &&
+             (!('status' in data) || (data.status in ['confirmed', 'pending_validation'])) &&
+             (!('clarification_required' in data) || (data.clarification_required is string)) &&
+             (!('reason' in data) || (data.reason is string));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser();
+      allow update: if isOwner(userId) && isValidUser() && 
+                    request.resource.data.created_at == resource.data.created_at;
+      allow delete: if isOwner(userId);
+
+      match /food_logs/{logId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidFoodLog();
+        allow update: if isOwner(userId) && isValidFoodLog() && 
+                      request.resource.data.userId == resource.data.userId;
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

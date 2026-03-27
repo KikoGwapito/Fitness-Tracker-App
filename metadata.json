@@ -1,0 +1,7 @@
+{
+  "name": "G-Refine",
+  "description": "A multimodal food logging app that uses Gemini Vision to analyze meals and track macros.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

@@ -1,0 +1,553 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera, Plus, Activity, Flame, Droplets, Beef, X, Loader2, MessageSquare, Image as ImageIcon, LogOut, LogIn } from 'lucide-react';
+import { analyzeMeal } from './lib/gemini';
+import { FoodLog, DailyGoals, UserProfile, UserSettings } from './types';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from './lib/utils';
+import { auth } from './firebase';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { firebaseService } from './services/FirebaseService';
+import { handleFirestoreError, OperationType } from './lib/error-handler';
+import { BottomNav, TabType } from './components/BottomNav';
+import { Dashboard } from './pages/Dashboard';
+import { History } from './pages/History';
+import { Progress } from './pages/Progress';
+import { UserProfileScreen } from './pages/UserProfileScreen';
+import { BasicInfoScreen } from './pages/BasicInfoScreen';
+import { MenuScreen } from './pages/Menu';
+import { AppInfo } from './pages/AppInfo';
+import { ConfirmModal } from './components/ConfirmModal';
+
+const DEFAULT_GOALS: DailyGoals = {
+  calories: 2200,
+  protein_g: 150,
+  carbs_g: 250,
+  fat_g: 70,
+  sugar_g: 50,
+  sodium_mg: 2300,
+};
+
+export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [subPage, setSubPage] = useState<'none' | 'profile' | 'basic-info' | 'app-info'>('none');
+
+  // Apply Settings
+  useEffect(() => {
+    if (profile?.settings) {
+      const { accentColor, fontSize, theme } = profile.settings;
+      
+      // Accent Color
+      document.documentElement.style.setProperty('--c-accent', accentColor);
+      
+      // Font Size
+      document.documentElement.classList.remove('text-small', 'text-medium', 'text-large');
+      document.documentElement.classList.add(`text-${fontSize}`);
+      
+      // Theme
+      if (theme === 'light') {
+        document.documentElement.classList.add('light');
+      } else {
+        document.documentElement.classList.remove('light');
+      }
+    } else {
+      // Defaults
+      document.documentElement.style.setProperty('--c-accent', '#F27D26');
+      document.documentElement.classList.remove('text-small', 'text-large', 'light');
+      document.documentElement.classList.add('text-medium');
+    }
+  }, [profile?.settings]);
+  
+  const [logs, setLogs] = useState<FoodLog[]>([]);
+  const [isLogging, setIsLogging] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [textInput, setTextInput] = useState('');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageMimeType, setImageMimeType] = useState<string | null>(null);
+  const [editingLog, setEditingLog] = useState<FoodLog | null>(null);
+  const [pendingAnalysis, setPendingAnalysis] = useState<{
+    clarification_required: string;
+    reason: string;
+    data: any;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'primary';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  // Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      setIsAuthReady(true);
+
+      if (currentUser) {
+        await firebaseService.ensureUserProfile(currentUser, DEFAULT_GOALS);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch Logs and Profile from Firestore
+  useEffect(() => {
+    if (!isAuthReady || !user) {
+      setLogs([]);
+      setProfile(null);
+      return;
+    }
+
+    // Profile listener
+    const profileUnsubscribe = firebaseService.subscribeToProfile(user.uid, setProfile);
+
+    // Logs listener
+    const logsUnsubscribe = firebaseService.subscribeToMeals(user.uid, setLogs);
+
+    return () => {
+      profileUnsubscribe();
+      logsUnsubscribe();
+    };
+  }, [user, isAuthReady]);
+
+  const handleLogin = async () => {
+    const loggedInUser = await firebaseService.signInWithGoogle();
+    if (loggedInUser) {
+      setUser(loggedInUser);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    setSubPage('none');
+  };
+
+  const todayLogs = logs.filter(log => {
+    const today = new Date().setHours(0, 0, 0, 0);
+    const logDate = new Date(log.timestamp).setHours(0, 0, 0, 0);
+    return today === logDate;
+  });
+
+  const currentTotals = todayLogs.reduce(
+    (acc, log) => ({
+      calories: acc.calories + log.macros.calories,
+      protein_g: acc.protein_g + log.macros.protein,
+      carbs_g: acc.carbs_g + log.macros.carbs,
+      fat_g: acc.fat_g + log.macros.fat,
+      sugar_g: acc.sugar_g + (log.sugar_g || 0),
+      sodium_mg: acc.sodium_mg + (log.sodium_mg || 0),
+    }),
+    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, sugar_g: 0, sodium_mg: 0 }
+  );
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImageMimeType(file.type);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setSelectedImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDeleteLog = async (logId: string) => {
+    if (!user) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Meal',
+      message: 'Are you sure you want to delete this meal? This action cannot be undone.',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await firebaseService.deleteMealFromFirebase(user.uid, logId);
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        } catch (error) {
+          console.error('Delete failed:', error);
+        }
+      }
+    });
+  };
+
+  const handleEditLog = (log: FoodLog) => {
+    setEditingLog(log);
+    setTextInput(log.foodName);
+    // Note: We don't restore the image for editing to save bandwidth/complexity, 
+    // but we could if we stored the URL.
+    setIsLogging(true);
+  };
+
+  const handleAnalyze = async () => {
+    if (!textInput && !selectedImage && !editingLog) return;
+    
+    if (editingLog) {
+      setConfirmModal({
+        isOpen: true,
+        title: 'Save Changes',
+        message: 'Are you sure you want to save these changes? The AI will recalculate the macros based on your new input.',
+        variant: 'primary',
+        onConfirm: () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          performAnalysis();
+        }
+      });
+    } else {
+      performAnalysis();
+    }
+  };
+
+  const performAnalysis = async (additionalContext?: string) => {
+    setIsAnalyzing(true);
+    try {
+      let imagePart;
+      if (selectedImage && imageMimeType) {
+        const base64Data = selectedImage.split(',')[1];
+        imagePart = {
+          inlineData: {
+            data: base64Data,
+            mimeType: imageMimeType
+          }
+        };
+      }
+
+      const prompt = additionalContext 
+        ? `${textInput}\n\nUser clarification: ${additionalContext}`
+        : textInput;
+
+      const result = await analyzeMeal(imagePart, prompt);
+      
+      if (result.status === 'pending_validation') {
+        setPendingAnalysis({
+          clarification_required: result.clarification_required,
+          reason: result.reason,
+          data: result.data
+        });
+        setIsAnalyzing(false);
+        return;
+      }
+
+      const mealData = result.data;
+      delete mealData.image_url;
+      
+      if (editingLog) {
+        // Update existing
+        await firebaseService.updateMealInFirebase(user!.uid, editingLog.id, {
+          ...mealData,
+          food_name: textInput || mealData.food_name,
+        });
+      } else {
+        // Create new
+        await firebaseService.saveMealToFirebase(user!.uid, {
+          ...mealData,
+          image_url: selectedImage || undefined
+        }, result.status === 'confirmed');
+      }
+
+      setIsLogging(false);
+      setEditingLog(null);
+      setPendingAnalysis(null);
+      setTextInput('');
+      setSelectedImage(null);
+      setImageMimeType(null);
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      alert('Failed to analyze meal. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const latestTip = todayLogs.length > 0 ? todayLogs[0].coach_tip : "Log your first meal to get personalized AI insights!";
+
+  const handleUpdateSettings = async (settings: UserSettings) => {
+    if (!user) return;
+    await firebaseService.updateProfileSettings(user.uid, settings);
+  };
+
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-accent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center p-6 text-center overflow-hidden">
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-24 h-24 bg-accent/10 rounded-full flex items-center justify-center mb-8 border border-accent/20"
+        >
+          <Activity className="w-12 h-12 text-accent" />
+        </motion.div>
+        <h1 className="text-6xl md:text-8xl font-display uppercase leading-none mb-4 animate-slam">
+          G-<span className="text-stroke">Refine</span>
+        </h1>
+        <p className="text-ink/60 mb-12 max-w-sm font-light tracking-wide uppercase text-xs">
+          Refining oneself through better food choices.
+        </p>
+        <button
+          onClick={handleLogin}
+          className="vonas-button vonas-button-primary"
+        >
+          <LogIn className="w-5 h-5" />
+          Continue with Google
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-bg text-ink font-sans selection:bg-accent/30 flex justify-center">
+      {/* Mobile-first container */}
+      <div className="w-full max-w-md h-[100dvh] flex flex-col relative bg-bg overflow-hidden">
+        
+        {/* App Header */}
+        <header className="px-6 py-4 border-b border-white/5 flex items-center justify-center">
+          <h1 className="text-xl font-display uppercase tracking-[0.2em] text-white">
+            G-<span className="text-accent font-light">Refine</span>
+          </h1>
+        </header>
+
+        {activeTab === 'dashboard' && (
+          <Dashboard 
+            user={user} 
+            profile={profile} 
+            logs={logs} 
+            onDeleteLog={handleDeleteLog} 
+            onEditLog={handleEditLog} 
+          />
+        )}
+        {activeTab === 'history' && <History logs={logs} onEditLog={handleEditLog} onDeleteLog={handleDeleteLog} profile={profile} />}
+        {activeTab === 'progress' && <Progress logs={logs} profile={profile} />}
+        
+        {activeTab === 'menu' && subPage === 'none' && (
+          <MenuScreen 
+            userEmail={user?.email || ''}
+            profile={profile}
+            logs={logs}
+            onNavigate={setSubPage} 
+            onLogout={handleLogout} 
+            onUpdateSettings={handleUpdateSettings}
+          />
+        )}
+        {activeTab === 'menu' && subPage === 'profile' && (
+          <UserProfileScreen 
+            user={user} 
+            profile={profile} 
+            onBack={() => setSubPage('none')} 
+          />
+        )}
+        {activeTab === 'menu' && subPage === 'basic-info' && (
+          <BasicInfoScreen 
+            user={user} 
+            profile={profile} 
+            onBack={() => setSubPage('none')} 
+          />
+        )}
+        {activeTab === 'menu' && subPage === 'app-info' && (
+          <AppInfo onBack={() => setSubPage('none')} />
+        )}
+
+        <BottomNav 
+          activeTab={activeTab} 
+          onChange={handleTabChange} 
+          onSnapClick={() => {
+            setEditingLog(null);
+            setTextInput('');
+            setSelectedImage(null);
+            setIsLogging(true);
+          }} 
+        />
+
+        {/* Logging Modal */}
+        <AnimatePresence>
+          {isLogging && (
+            <motion.div 
+              initial={{ opacity: 0, y: '100%' }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="absolute inset-0 z-50 bg-bg flex flex-col"
+            >
+              <div className="px-6 pt-12 pb-4 flex items-center justify-between border-b border-white/5">
+                <h2 className="text-2xl font-display uppercase text-white">{editingLog ? 'Edit Meal' : 'Log Meal'}</h2>
+                <button 
+                  onClick={() => {
+                    setIsLogging(false);
+                    setEditingLog(null);
+                  }}
+                  className="p-2 bg-white/5 rounded-full text-ink/40 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8">
+                
+                {pendingAnalysis ? (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col gap-6"
+                  >
+                    <div className="vonas-card border-notify/30 bg-notify/5">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="p-2 bg-notify/10 rounded-lg">
+                          <MessageSquare className="w-5 h-5 text-notify" />
+                        </div>
+                        <h3 className="text-sm font-display uppercase tracking-widest text-notify">AI Coach Question</h3>
+                      </div>
+                      <p className="text-lg font-display uppercase leading-tight text-white mb-2">
+                        {pendingAnalysis.clarification_required}
+                      </p>
+                      <p className="text-[10px] font-display uppercase tracking-widest text-white/40 italic">
+                        Reason: {pendingAnalysis.reason}
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-display uppercase tracking-widest text-ink/40">Your Answer</label>
+                      <textarea 
+                        autoFocus
+                        placeholder="e.g., It was grilled dry, no oil used."
+                        className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-5 text-white placeholder:text-ink/20 focus:outline-none focus:border-accent resize-none transition-all font-light"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            performAnalysis((e.target as HTMLTextAreaElement).value);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={() => setPendingAnalysis(null)}
+                        className="vonas-button flex-1 py-4 text-white/40 hover:text-white"
+                      >
+                        Back
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const textarea = document.querySelector('textarea');
+                          if (textarea) performAnalysis(textarea.value);
+                        }}
+                        className="vonas-button vonas-button-primary flex-[2] py-4"
+                      >
+                        Confirm Details
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <>
+                    {/* Image Upload Area */}
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className={cn(
+                        "relative w-full aspect-square rounded-3xl border-2 border-dashed flex flex-col items-center justify-center overflow-hidden cursor-pointer transition-all duration-500",
+                        selectedImage ? "border-accent/50 bg-white/5" : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
+                      )}
+                    >
+                      {selectedImage ? (
+                        <>
+                          <img src={selectedImage} alt="Selected meal" className="absolute inset-0 w-full h-full object-cover opacity-80" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent" />
+                          <div className="relative z-10 flex items-center gap-2 bg-bg/80 px-6 py-3 rounded-full backdrop-blur-xl border border-white/10">
+                            <ImageIcon className="w-4 h-4 text-accent" />
+                            <span className="text-xs font-display uppercase tracking-wider">Change Photo</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10">
+                            <Camera className="w-8 h-8 text-ink/40" />
+                          </div>
+                          <p className="text-xs font-display uppercase tracking-widest text-white">Tap to snap</p>
+                          <p className="text-[10px] text-ink/40 mt-2 uppercase tracking-tighter">Or upload from gallery</p>
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment"
+                        className="hidden" 
+                        ref={fileInputRef}
+                        onChange={handleImageSelect}
+                      />
+                    </div>
+
+                    {/* Natural Language Input */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-display uppercase tracking-widest text-ink/40">
+                        {editingLog ? 'Update description' : 'Describe your meal'}
+                      </label>
+                      <textarea 
+                        value={textInput}
+                        onChange={(e) => setTextInput(e.target.value)}
+                        placeholder="e.g., Two poached eggs on sourdough toast with avocado..."
+                        className="w-full h-40 bg-white/5 border border-white/10 rounded-2xl p-5 text-white placeholder:text-ink/20 focus:outline-none focus:border-accent resize-none transition-all font-light"
+                      />
+                    </div>
+
+                    <div className="mt-auto pt-6 pb-safe">
+                      <button 
+                        onClick={() => performAnalysis()}
+                        disabled={isAnalyzing || (!textInput && !selectedImage && !editingLog)}
+                        className="vonas-button vonas-button-primary w-full py-5"
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span>Analyzing with AI...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Flame className="w-5 h-5" />
+                            <span>{editingLog ? 'Update & Re-analyze' : 'Analyze & Log'}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
+
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Confirm Modal */}
+        <ConfirmModal 
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          variant={confirmModal.variant}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        />
+      </div>
+    </div>
+  );
+}

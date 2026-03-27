@@ -1,0 +1,191 @@
+import { auth, db } from '../firebase';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  User 
+} from 'firebase/auth';
+import { 
+  collection, 
+  addDoc, 
+  serverTimestamp,
+  query,
+  orderBy,
+  onSnapshot,
+  doc,
+  deleteDoc,
+  updateDoc,
+  getDoc,
+  setDoc
+} from 'firebase/firestore';
+import { FoodLog, UserProfile } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/error-handler';
+
+class FirebaseService {
+  /**
+   * Authentication Logic: Implement a signInWithGoogle() function using firebase_auth.
+   * Ensure the User object is captured to retrieve the unique uid.
+   */
+  async signInWithGoogle(): Promise<User | null> {
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      return result.user;
+    } catch (error) {
+      console.error("Error signing in with Google:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Data Mapping: When Gemini processes a food image or text, it must return a JSON object.
+   * Create a function saveMealToFirebase(String uid, Map macroData) that pushes this JSON to the user's specific sub-collection.
+   * 
+   * Database Pathing (Firestore): All food data must be saved to a hierarchical path: users/{uid}/food_logs/{logId}.
+   */
+  async saveMealToFirebase(uid: string, mealData: any, isValidated: boolean) {
+    const logRef = collection(db, `users/${uid}/food_logs`);
+    
+    // User Data Schema to use:
+    const data = {
+      userId: uid,
+      timestamp: serverTimestamp(), // Ensure the Timestamp is automatically added to every entry
+      foodName: mealData.food_name || mealData.foodName,
+      macros: {
+        calories: mealData.calories,
+        protein: mealData.protein_g || mealData.protein,
+        carbs: mealData.carbs_g || mealData.carbs,
+        fat: mealData.fat_g || mealData.fat,
+      },
+      isValidated: isValidated,
+      // Including additional fields required for app functionality
+      sugar_g: mealData.sugar_g || 0,
+      sodium_mg: mealData.sodium_mg || 0,
+      health_score: mealData.health_score || 0,
+      coach_tip: mealData.coach_tip || "",
+      image_url: mealData.image_url || null,
+      status: mealData.status || (isValidated ? 'confirmed' : 'pending_validation'),
+      clarification_required: mealData.clarification_required || null,
+      reason: mealData.reason || null
+    };
+    
+    try {
+      return await addDoc(logRef, data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `users/${uid}/food_logs`);
+      throw error;
+    }
+  }
+
+  async updateMealInFirebase(uid: string, logId: string, mealData: any) {
+    const logRef = doc(db, `users/${uid}/food_logs`, logId);
+    
+    const data = {
+      foodName: mealData.food_name || mealData.foodName,
+      macros: {
+        calories: mealData.calories,
+        protein: mealData.protein_g || mealData.protein,
+        carbs: mealData.carbs_g || mealData.carbs,
+        fat: mealData.fat_g || mealData.fat,
+      },
+      isValidated: mealData.status === 'confirmed',
+      sugar_g: mealData.sugar_g || 0,
+      sodium_mg: mealData.sodium_mg || 0,
+      health_score: mealData.health_score || 0,
+      coach_tip: mealData.coach_tip || "",
+      status: mealData.status || 'confirmed',
+      clarification_required: mealData.clarification_required || null,
+      reason: mealData.reason || null
+    };
+
+    try {
+      await updateDoc(logRef, data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}/food_logs/${logId}`);
+      throw error;
+    }
+  }
+
+  async deleteMealFromFirebase(uid: string, logId: string) {
+    try {
+      await deleteDoc(doc(db, `users/${uid}/food_logs`, logId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${uid}/food_logs/${logId}`);
+      throw error;
+    }
+  }
+
+  subscribeToMeals(uid: string, callback: (logs: FoodLog[]) => void) {
+    const q = query(
+      collection(db, `users/${uid}/food_logs`),
+      orderBy('timestamp', 'desc')
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      const logs: FoodLog[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        // Map Firestore schema back to app's FoodLog interface
+        logs.push({
+          id: doc.id,
+          userId: data.userId,
+          timestamp: data.timestamp?.toMillis?.() || data.timestamp || Date.now(),
+          foodName: data.foodName,
+          macros: data.macros,
+          calories: data.macros.calories,
+          protein_g: data.macros.protein,
+          carbs_g: data.macros.carbs,
+          fat_g: data.macros.fat,
+          sugar_g: data.sugar_g,
+          sodium_mg: data.sodium_mg,
+          health_score: data.health_score,
+          coach_tip: data.coach_tip,
+          image_url: data.image_url,
+          isValidated: data.isValidated,
+          status: data.status,
+          clarification_required: data.clarification_required,
+          reason: data.reason
+        } as FoodLog);
+      });
+      callback(logs);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `users/${uid}/food_logs`);
+    });
+  }
+
+  async ensureUserProfile(user: User, defaultGoals: any) {
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          email: user.email || 'unknown@example.com',
+          daily_goals: defaultGoals,
+          created_at: Date.now()
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}`);
+    }
+  }
+
+  subscribeToProfile(uid: string, callback: (profile: UserProfile) => void) {
+    return onSnapshot(doc(db, 'users', uid), (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data() as UserProfile);
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `users/${uid}`);
+    });
+  }
+
+  async updateProfileSettings(uid: string, settings: any) {
+    try {
+      const userRef = doc(db, 'users', uid);
+      await updateDoc(userRef, { settings });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+    }
+  }
+}
+
+export const firebaseService = new FirebaseService();
