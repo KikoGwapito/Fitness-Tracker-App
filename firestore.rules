@@ -110,7 +110,8 @@ service cloud.firestore {
              (!('height_cm' in data) || (data.height_cm is number && data.height_cm > 0)) &&
              (!('activity_level' in data) || (data.activity_level in ['sedentary', 'light', 'moderate', 'active', 'very_active'])) &&
              (!('goal' in data) || (data.goal in ['lose', 'maintain', 'gain'])) &&
-             (!('bmr' in data) || (data.bmr is number && data.bmr > 0));
+             (!('bmr' in data) || (data.bmr is number && data.bmr > 0)) &&
+             (!('settings' in data) || (data.settings is map));
     }
 
     function isValidFoodLog() {
@@ -130,8 +131,8 @@ service cloud.firestore {
              data.health_score is number && data.health_score >= 0 && data.health_score <= 10 &&
              data.coach_tip is string && data.coach_tip.size() <= 1000 &&
              data.isValidated is bool &&
-             (!('image_url' in data) || (data.image_url is string && data.image_url.size() <= 2048)) &&
-             (!('status' in data) || (data.status in ['confirmed', 'pending_validation'])) &&
+             (!('image_url' in data) || (data.image_url is string && data.image_url.size() <= 1048576)) &&
+             (!('status' in data) || (data.status in ['confirmed', 'pending', 'error'])) &&
              (!('clarification_required' in data) || (data.clarification_required is string)) &&
              (!('reason' in data) || (data.reason is string));
     }

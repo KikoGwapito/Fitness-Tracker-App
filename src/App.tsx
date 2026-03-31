@@ -70,6 +70,7 @@ export default function App() {
   const [pendingAnalysis, setPendingAnalysis] = useState<{
     clarification_required: string;
     reason: string;
+    quick_options: string[] | null;
     data: any;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -229,24 +230,47 @@ export default function App() {
         };
       }
 
-      const prompt = additionalContext 
-        ? `${textInput}\n\nUser clarification: ${additionalContext}`
-        : textInput;
+      let prompt = textInput;
+      if (additionalContext) {
+        prompt += `\n\nUser clarification: ${additionalContext}`;
+        if (additionalContext === "None of these / Show more" && pendingAnalysis?.quick_options) {
+          prompt += `\nPrevious options shown (do not repeat these): ${pendingAnalysis.quick_options.join(', ')}`;
+        }
+      }
 
       const result = await analyzeMeal(imagePart, prompt);
       
-      if (result.status === 'pending_validation') {
+      if (result.status === 'error') {
+        alert(`Analysis Error: ${result.message}`);
+        setIsAnalyzing(false);
+        return;
+      }
+
+      if (result.status === 'pending') {
         setPendingAnalysis({
-          clarification_required: result.clarification_required,
-          reason: result.reason,
-          data: result.data
+          clarification_required: result.message || "Please provide more details.",
+          reason: "Dynamic Identification Phase",
+          quick_options: result.quick_options || null,
+          data: null
         });
         setIsAnalyzing(false);
         return;
       }
 
-      const mealData = result.data;
-      delete mealData.image_url;
+      const mealData = {
+        food_name: result.food_name || textInput || "Logged Meal",
+        calories: result.macros?.calories || 0,
+        protein: result.macros?.protein || 0,
+        carbs: result.macros?.carbs || 0,
+        fat: result.macros?.fat || 0,
+        sugar_g: result.macros?.sugar || 0,
+        sodium_mg: result.macros?.sodium || 0,
+        health_score: result.health_score || 10,
+        coach_tip: result.message || "Great job logging your meal!",
+        status: result.status,
+        clarification_required: null,
+        reason: null
+      };
       
       if (editingLog) {
         // Update existing
@@ -428,7 +452,22 @@ export default function App() {
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-[10px] font-display uppercase tracking-widest text-ink/40">Your Answer</label>
+                      {pendingAnalysis.quick_options && pendingAnalysis.quick_options.length > 0 && (
+                        <div className="flex flex-col gap-2 mb-4">
+                          <label className="text-[10px] font-display uppercase tracking-widest text-ink/40">Quick Answers</label>
+                          {pendingAnalysis.quick_options.map((option, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => performAnalysis(option)}
+                              className="w-full text-left px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-light text-white transition-colors"
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <label className="text-[10px] font-display uppercase tracking-widest text-ink/40">Or type your answer</label>
                       <textarea 
                         autoFocus
                         placeholder="e.g., It was grilled dry, no oil used."

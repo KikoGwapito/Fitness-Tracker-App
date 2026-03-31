@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -24,66 +24,110 @@ export async function analyzeMeal(imagePart?: { inlineData: { data: string; mime
   parts.push({ text: prompt });
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3.1-pro-preview",
     contents: { parts },
     config: {
-      systemInstruction: `You are an elite performance nutritionist and AI coach. Your job is to parse messy user input (images or text) of their meals and return structured JSON containing the nutritional breakdown.
+      systemInstruction: `## ROLE
+You are the "Elite Performance Nutritionist" (EPN). Your mission is to provide zero-friction macro logging for athletes.
 
-### AMBIGUITY & INPUT VALIDATION PROTOCOL:
-1. THE "HIDDEN VARIABLE" RULE:
-Whenever a user logs a meal via photo or vague text, do NOT assume ingredients that aren't visible or stated. Trigger a Clarifying Query if any of the following are missing:
-- Cooking Fats: If a protein (steak, eggs, chicken) is logged, ask: "Was this prepared with oil, butter, or was it grilled dry?"
-- Hidden Bases: If a stew, curry, or stir-fry is shown in a deep bowl, ask: "Is there a base of rice, quinoa, or noodles underneath?"
-- Liquid Calories: If a meal looks dry or is a "breakfast" log, ask: "Did you have a coffee, juice, or milk with this?"
+## PHASE 1: DYNAMIC IDENTIFICATION
+1. Identify the meal name immediately (e.g., "Chicken Inasal Pecho").
+2. If any cooking details or portion sizes are ambiguous, set "status": "pending".
+3. GENERATE QUICK OPTIONS: Provide 3 likely variations (e.g., "Grilled - No Oil", "With Java Rice", "Extra Large Portion").
+4. THE ANCHOR: The 4th option MUST ALWAYS be "None of these / Show more".
 
-2. THE CONFIDENCE THRESHOLD (VISION LOGIC):
-- High Confidence (>85%): Proceed to calculate macros and set status to "confirmed".
-- Low Confidence (<85%): Set status to "pending_validation" and provide a polite, performance-focused question in 'clarification_required' to narrow down the portion size or ingredient.
-Example: "That salmon looks great for recovery! Is that a standard 150g fillet, or a larger cut?"
+## PHASE 2: THE RECURSIVE LOOP
+- If the user selects "None of these / Show more", you must generate 3 NEW, DIFFERENT likely variations of the meal to help them find the right one.
+- Continue this loop until a selection is made or the user provides a manual text description.
 
-3. OUTPUT STRUCTURE:
-Return a JSON object with:
-- status: "pending_validation" or "confirmed"
-- data: The nutritional breakdown (only if confirmed, or best estimate if pending)
-- clarification_required: The question for the user if status is pending.
-- reason: Why you are unsure (e.g., 'Volumetric uncertainty', 'Hidden ingredients').`,
+## PHASE 3: FINAL CALCULATION & STORAGE
+- Once a detail is selected or described, set "status": "confirmed".
+- You MUST populate the "food_name" field with the specific meal title.
+- Provide high-precision macros based on the final selection.
+
+## STRICT JSON OUTPUT (NO MARKDOWN, NO TEXT)
+{
+  "status": "pending" | "confirmed" | "error",
+  "food_name": "Name of the meal",
+  "message": "Short coach question or confirmation",
+  "quick_options": ["Option 1", "Option 2", "Option 3", "None of these / Show more"] | null,
+  "macros": {
+    "protein": number,
+    "carbs": number,
+    "fat": number,
+    "calories": number,
+    "sugar": number,
+    "sodium": number
+  } | null,
+  "health_score": number
+}`,
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          status: { type: Type.STRING, enum: ["pending_validation", "confirmed"], description: "Whether the log is ready or needs more info" },
-          clarification_required: { type: Type.STRING, description: "The question to ask the user if status is pending" },
-          reason: { type: Type.STRING, description: "Why the AI is unsure" },
-          data: {
+          status: { type: Type.STRING, enum: ["pending", "confirmed", "error"], description: "Status of the analysis" },
+          food_name: { type: Type.STRING, description: "Name of the meal" },
+          message: { type: Type.STRING, description: "Short coach question or confirmation" },
+          quick_options: {
+            type: Type.ARRAY,
+            nullable: true,
+            items: { type: Type.STRING },
+            description: "Quick options for the user to select from"
+          },
+          macros: {
             type: Type.OBJECT,
+            nullable: true,
             properties: {
-              foodName: { type: Type.STRING, description: "A short, descriptive name for the meal" },
-              macros: {
-                type: Type.OBJECT,
-                properties: {
-                  calories: { type: Type.NUMBER, description: "Estimated total calories" },
-                  protein: { type: Type.NUMBER, description: "Estimated protein in grams" },
-                  carbs: { type: Type.NUMBER, description: "Estimated carbohydrates in grams" },
-                  fat: { type: Type.NUMBER, description: "Estimated fat in grams" },
-                },
-                required: ["calories", "protein", "carbs", "fat"]
-              },
-              sugar_g: { type: Type.NUMBER, description: "Estimated sugar in grams" },
-              sodium_mg: { type: Type.NUMBER, description: "Estimated sodium in milligrams" },
-              health_score: { type: Type.NUMBER, description: "Health score from 1 to 10" },
-              coach_tip: { type: Type.STRING, description: "A short, contextual coaching tip" }
-            },
-            required: ["foodName", "macros", "sugar_g", "sodium_mg", "health_score", "coach_tip"]
-          }
+              protein: { type: Type.INTEGER, description: "Protein in grams" },
+              carbs: { type: Type.INTEGER, description: "Carbs in grams" },
+              fat: { type: Type.INTEGER, description: "Fat in grams" },
+              calories: { type: Type.INTEGER, description: "Total calories" },
+              sugar: { type: Type.INTEGER, description: "Sugar in grams" },
+              sodium: { type: Type.INTEGER, description: "Sodium in milligrams" },
+            }
+          },
+          health_score: { type: Type.INTEGER, description: "Health score from 1 to 10" }
         },
-        required: ["status", "data"]
-      }
+        required: ["status", "food_name", "message"]
+      },
+      safetySettings: [
+        {
+          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+          threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+          threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+          threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+          threshold: HarmBlockThreshold.BLOCK_NONE,
+        }
+      ]
     }
   });
 
   if (!response.text) {
-    throw new Error("Failed to generate analysis");
+    throw new Error("Failed to generate analysis: No text returned");
   }
 
-  return JSON.parse(response.text);
+  let text = response.text.trim();
+  
+  // Strip markdown formatting if present
+  if (text.startsWith('```')) {
+    text = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Failed to parse JSON. Raw text length:", text.length);
+    console.error("First 200 chars:", text.substring(0, 200));
+    console.error("Last 200 chars:", text.substring(text.length - 200));
+    throw new Error("Failed to parse JSON response from AI.");
+  }
 }

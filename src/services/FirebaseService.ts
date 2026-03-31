@@ -46,7 +46,7 @@ class FirebaseService {
     const logRef = collection(db, `users/${uid}/food_logs`);
     
     // User Data Schema to use:
-    const data = {
+    const data: any = {
       userId: uid,
       timestamp: serverTimestamp(), // Ensure the Timestamp is automatically added to every entry
       foodName: mealData.food_name || mealData.foodName,
@@ -62,11 +62,12 @@ class FirebaseService {
       sodium_mg: mealData.sodium_mg || 0,
       health_score: mealData.health_score || 0,
       coach_tip: mealData.coach_tip || "",
-      image_url: mealData.image_url || null,
-      status: mealData.status || (isValidated ? 'confirmed' : 'pending_validation'),
-      clarification_required: mealData.clarification_required || null,
-      reason: mealData.reason || null
+      status: mealData.status || (isValidated ? 'confirmed' : 'pending')
     };
+    
+    if (mealData.image_url) data.image_url = mealData.image_url;
+    if (mealData.clarification_required) data.clarification_required = mealData.clarification_required;
+    if (mealData.reason) data.reason = mealData.reason;
     
     try {
       return await addDoc(logRef, data);
@@ -79,7 +80,7 @@ class FirebaseService {
   async updateMealInFirebase(uid: string, logId: string, mealData: any) {
     const logRef = doc(db, `users/${uid}/food_logs`, logId);
     
-    const data = {
+    const data: any = {
       foodName: mealData.food_name || mealData.foodName,
       macros: {
         calories: mealData.calories,
@@ -92,10 +93,11 @@ class FirebaseService {
       sodium_mg: mealData.sodium_mg || 0,
       health_score: mealData.health_score || 0,
       coach_tip: mealData.coach_tip || "",
-      status: mealData.status || 'confirmed',
-      clarification_required: mealData.clarification_required || null,
-      reason: mealData.reason || null
+      status: mealData.status || 'confirmed'
     };
+    
+    if (mealData.clarification_required) data.clarification_required = mealData.clarification_required;
+    if (mealData.reason) data.reason = mealData.reason;
 
     try {
       await updateDoc(logRef, data);
@@ -130,15 +132,16 @@ class FirebaseService {
           userId: data.userId,
           timestamp: data.timestamp?.toMillis?.() || data.timestamp || Date.now(),
           foodName: data.foodName,
-          macros: data.macros,
-          calories: data.macros.calories,
-          protein_g: data.macros.protein,
-          carbs_g: data.macros.carbs,
-          fat_g: data.macros.fat,
-          sugar_g: data.sugar_g,
-          sodium_mg: data.sodium_mg,
-          health_score: data.health_score,
-          coach_tip: data.coach_tip,
+          macros: {
+            calories: data.macros?.calories || data.macros?.cal || 0,
+            protein: data.macros?.protein || data.macros?.p || 0,
+            carbs: data.macros?.carbs || data.macros?.c || 0,
+            fat: data.macros?.fat || data.macros?.f || 0,
+          },
+          sugar_g: data.sugar_g || 0,
+          sodium_mg: data.sodium_mg || 0,
+          health_score: data.health_score || 0,
+          coach_tip: data.coach_tip || "",
           image_url: data.image_url,
           isValidated: data.isValidated,
           status: data.status,

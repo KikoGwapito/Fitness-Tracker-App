@@ -2,56 +2,28 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "A user of the AI Nutrition Tracker",
+      "description": "A user of the Shared To-Do List",
       "type": "object",
       "properties": {
         "email": { "type": "string", "format": "email" },
         "name": { "type": "string" },
-        "username": { "type": "string" },
-        "profile_picture": { "type": "string", "format": "uri" },
-        "age": { "type": "number" },
-        "gender": { "type": "string", "enum": ["male", "female"] },
-        "weight_kg": { "type": "number" },
-        "height_cm": { "type": "number" },
-        "activity_level": { "type": "string", "enum": ["sedentary", "light", "moderate", "active", "very_active"] },
-        "goal": { "type": "string", "enum": ["lose", "maintain", "gain"] },
-        "daily_goals": {
-          "type": "object",
-          "properties": {
-            "calories": { "type": "number" },
-            "protein_g": { "type": "number" },
-            "carbs_g": { "type": "number" },
-            "fat_g": { "type": "number" },
-            "sugar_g": { "type": "number" },
-            "sodium_mg": { "type": "number" }
-          },
-          "required": ["calories", "protein_g", "carbs_g", "fat_g", "sugar_g", "sodium_mg"]
-        },
-        "bmr": { "type": "number" },
-        "created_at": { "type": "number" }
+        "photoUrl": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "number" }
       },
-      "required": ["email", "daily_goals", "created_at"]
+      "required": ["email", "createdAt"]
     },
-    "FoodLog": {
-      "title": "FoodLog",
-      "description": "A logged meal",
+    "Todo": {
+      "title": "Todo",
+      "description": "A shared to-do item",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "food_name": { "type": "string" },
-        "calories": { "type": "number" },
-        "protein_g": { "type": "number" },
-        "carbs_g": { "type": "number" },
-        "fat_g": { "type": "number" },
-        "sugar_g": { "type": "number" },
-        "sodium_mg": { "type": "number" },
-        "health_score": { "type": "number" },
-        "coach_tip": { "type": "string" },
-        "image_url": { "type": "string" },
-        "timestamp": { "type": "number" }
+        "title": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "createdBy": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "createdAt": { "type": "number" }
       },
-      "required": ["id", "userId", "food_name", "calories", "protein_g", "carbs_g", "fat_g", "sugar_g", "sodium_mg", "health_score", "coach_tip", "timestamp"]
+      "required": ["title", "completed", "createdBy", "createdAt"]
     }
   },
   "firestore": {
@@ -59,9 +31,9 @@
       "schema": { "$ref": "#/entities/User" },
       "description": "User profiles"
     },
-    "/users/{userId}/logs/{logId}": {
-      "schema": { "$ref": "#/entities/FoodLog" },
-      "description": "Food logs for a user"
+    "/todos/{todoId}": {
+      "schema": { "$ref": "#/entities/Todo" },
+      "description": "Shared to-do items"
     }
   }
 }
