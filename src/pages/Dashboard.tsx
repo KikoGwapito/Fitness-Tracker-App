@@ -218,7 +218,7 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog }: Dashb
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-lg font-display uppercase truncate group-hover:text-accent transition-colors">{log.foodName}</h4>
+                    <h4 className="text-lg font-display uppercase break-words group-hover:text-accent transition-colors">{log.foodName}</h4>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px] font-display uppercase tracking-wider text-white/40">
                       <span className="flex items-center gap-1.5"><Flame className="w-3 h-3 text-accent" /> {log.macros.calories}</span>
                       <span className="flex items-center gap-1.5"><Beef className="w-3 h-3 text-blue-400" /> {log.macros.protein}g</span>

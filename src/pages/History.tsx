@@ -302,7 +302,7 @@ export function History({ logs, onEditLog, onDeleteLog, profile }: HistoryProps)
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-display uppercase truncate group-hover:text-accent transition-colors">{log.foodName}</h4>
+                          <h4 className="text-sm font-display uppercase break-words group-hover:text-accent transition-colors">{log.foodName}</h4>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[8px] font-display uppercase tracking-wider text-white/40">
                             <span className="flex items-center gap-1"><Flame className="w-2.5 h-2.5 text-accent" /> {log.macros.calories}</span>
                             <span className="flex items-center gap-1"><Beef className="w-2.5 h-2.5 text-blue-400" /> {log.macros.protein}g</span>

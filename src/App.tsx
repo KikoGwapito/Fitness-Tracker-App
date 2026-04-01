@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Plus, Activity, Flame, Droplets, Beef, X, Loader2, MessageSquare, Image as ImageIcon, LogOut, LogIn } from 'lucide-react';
+import { Camera, Plus, Activity, Flame, Droplets, Beef, X, Loader2, MessageSquare, Image as ImageIcon, LogOut, LogIn, ChevronRight, Sparkles, Apple } from 'lucide-react';
 import { analyzeMeal } from './lib/gemini';
 import { FoodLog, DailyGoals, UserProfile, UserSettings } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -415,6 +415,49 @@ export default function App() {
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="absolute inset-0 z-50 bg-bg flex flex-col"
             >
+              <AnimatePresence>
+                {isAnalyzing && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-[100] bg-bg/60 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center"
+                  >
+                    <div className="relative flex flex-col items-center justify-center mb-12">
+                      {/* Food dropping */}
+                      <motion.div
+                        animate={{ y: [0, 15, 0], scale: [1, 0.9, 1] }}
+                        transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                        className="z-10 relative"
+                      >
+                        <Apple className="w-16 h-16 text-accent drop-shadow-lg" fill="currentColor" />
+                      </motion.div>
+                      
+                      {/* Scale Platform */}
+                      <motion.div
+                        animate={{ y: [0, 8, 0] }}
+                        transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                        className="w-24 h-3 bg-white/80 rounded-t-lg mt-1 z-0 shadow-lg"
+                      />
+                      
+                      {/* Scale Base */}
+                      <div className="w-32 h-16 bg-white/10 backdrop-blur-md rounded-b-2xl flex items-center justify-center relative overflow-hidden border border-white/20 shadow-2xl">
+                        {/* Dial */}
+                        <div className="w-10 h-10 rounded-full border-2 border-white/30 flex items-center justify-center bg-white/5">
+                          <motion.div
+                            animate={{ rotate: [-45, 135, -45] }}
+                            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                            className="w-1 h-5 bg-accent origin-bottom -mt-4 rounded-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <h3 className="text-2xl font-display uppercase tracking-widest text-white mb-3 drop-shadow-md">Weighing Macros</h3>
+                    <p className="text-sm font-display uppercase tracking-widest text-white/60 animate-pulse">Analyzing nutritional data...</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="px-6 pt-12 pb-4 flex items-center justify-between border-b border-white/5">
                 <h2 className="text-2xl font-display uppercase text-white">{editingLog ? 'Edit Meal' : 'Log Meal'}</h2>
                 <button 
@@ -428,7 +471,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8">
+              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8 relative">
                 
                 {pendingAnalysis ? (
                   <motion.div 
@@ -459,9 +502,10 @@ export default function App() {
                             <button
                               key={idx}
                               onClick={() => performAnalysis(option)}
-                              className="w-full text-left px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-light text-white transition-colors"
+                              className="w-full text-left px-5 py-4 bg-white/5 hover:bg-accent/10 border border-white/10 hover:border-accent/50 rounded-2xl text-sm font-display uppercase tracking-wider text-white transition-all duration-300 flex items-center justify-between group"
                             >
-                              {option}
+                              <span>{option}</span>
+                              <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-accent transition-colors" />
                             </button>
                           ))}
                         </div>
