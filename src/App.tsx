@@ -3,7 +3,7 @@ import { Camera, Plus, Activity, Flame, Droplets, Beef, X, Loader2, MessageSquar
 import { analyzeMeal } from './lib/gemini';
 import { FoodLog, DailyGoals, UserProfile, UserSettings } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from './lib/utils';
+import { cn, compressImage } from './lib/utils';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { firebaseService } from './services/FirebaseService';
@@ -217,15 +217,18 @@ export default function App() {
   };
 
   const performAnalysis = async (additionalContext?: string) => {
+    if (isAnalyzing) return; // Prevent double-clicks
     setIsAnalyzing(true);
     try {
       let imagePart;
       if (selectedImage && imageMimeType) {
-        const base64Data = selectedImage.split(',')[1];
+        // Compress image to save on tokens (TPM limits)
+        const compressedDataUrl = await compressImage(selectedImage);
+        const base64Data = compressedDataUrl.split(',')[1];
         imagePart = {
           inlineData: {
             data: base64Data,
-            mimeType: imageMimeType
+            mimeType: 'image/jpeg' // We forced it to jpeg in compressImage
           }
         };
       }
