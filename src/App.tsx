@@ -163,10 +163,16 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImageMimeType(file.type);
+    setImageMimeType('image/jpeg'); // We will force it to jpeg during compression
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setSelectedImage(reader.result as string);
+    reader.onloadend = async () => {
+      try {
+        const compressedDataUrl = await compressImage(reader.result as string, 600, 0.6);
+        setSelectedImage(compressedDataUrl);
+      } catch (err) {
+        console.error("Failed to compress image immediately:", err);
+        setSelectedImage(reader.result as string); // Fallback to original
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -221,14 +227,14 @@ export default function App() {
     setIsAnalyzing(true);
     try {
       let imagePart;
+      let finalImageUrl = selectedImage;
+      
       if (selectedImage && imageMimeType) {
-        // Compress image to save on tokens (TPM limits)
-        const compressedDataUrl = await compressImage(selectedImage);
-        const base64Data = compressedDataUrl.split(',')[1];
+        const base64Data = selectedImage.split(',')[1];
         imagePart = {
           inlineData: {
             data: base64Data,
-            mimeType: 'image/jpeg' // We forced it to jpeg in compressImage
+            mimeType: imageMimeType
           }
         };
       }
@@ -277,15 +283,19 @@ export default function App() {
       
       if (editingLog) {
         // Update existing
-        await firebaseService.updateMealInFirebase(user!.uid, editingLog.id, {
+        const updateData: any = {
           ...mealData,
           food_name: textInput || mealData.food_name,
-        });
+        };
+        if (finalImageUrl) {
+          updateData.image_url = finalImageUrl;
+        }
+        await firebaseService.updateMealInFirebase(user!.uid, editingLog.id, updateData);
       } else {
         // Create new
         await firebaseService.saveMealToFirebase(user!.uid, {
           ...mealData,
-          image_url: selectedImage || undefined
+          image_url: finalImageUrl || undefined
         }, result.status === 'confirmed');
       }
 

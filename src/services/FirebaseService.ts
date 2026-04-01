@@ -71,7 +71,17 @@ class FirebaseService {
     
     try {
       return await addDoc(logRef, data);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message && error.message.includes('exceeds the maximum allowed size')) {
+        console.warn("Document too large, retrying without image...");
+        delete data.image_url;
+        try {
+          return await addDoc(logRef, data);
+        } catch (innerError) {
+          handleFirestoreError(innerError, OperationType.CREATE, `users/${uid}/food_logs`);
+          throw innerError;
+        }
+      }
       handleFirestoreError(error, OperationType.CREATE, `users/${uid}/food_logs`);
       throw error;
     }
@@ -96,12 +106,24 @@ class FirebaseService {
       status: mealData.status || 'confirmed'
     };
     
+    if (mealData.image_url) data.image_url = mealData.image_url;
     if (mealData.clarification_required) data.clarification_required = mealData.clarification_required;
     if (mealData.reason) data.reason = mealData.reason;
 
     try {
       await updateDoc(logRef, data);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message && error.message.includes('exceeds the maximum allowed size')) {
+        console.warn("Document too large, retrying without image...");
+        delete data.image_url;
+        try {
+          await updateDoc(logRef, data);
+          return;
+        } catch (innerError) {
+          handleFirestoreError(innerError, OperationType.UPDATE, `users/${uid}/food_logs/${logId}`);
+          throw innerError;
+        }
+      }
       handleFirestoreError(error, OperationType.UPDATE, `users/${uid}/food_logs/${logId}`);
       throw error;
     }
