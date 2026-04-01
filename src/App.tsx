@@ -292,9 +292,9 @@ export default function App() {
       setTextInput('');
       setSelectedImage(null);
       setImageMimeType(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Analysis failed:', error);
-      alert('Failed to analyze meal. Please try again.');
+      alert(`Failed to analyze meal: ${error.message || 'Unknown error'}. Please try again.`);
     } finally {
       setIsAnalyzing(false);
     }
