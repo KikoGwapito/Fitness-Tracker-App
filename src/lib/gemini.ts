@@ -101,7 +101,7 @@ You are the "Elite Performance Nutritionist" (EPN), a world-class sports dietiti
                     sugar: { type: Type.INTEGER, description: "Sugar in grams" },
                     sodium: { type: Type.INTEGER, description: "Sodium in milligrams" },
                   },
-                  required: ["protein", "carbs", "fat", "calories"]
+                  required: ["protein", "carbs", "fat", "calories", "sugar", "sodium"]
                 },
                 health_score: { type: Type.INTEGER, description: "Health score from 1 to 10" }
               },
