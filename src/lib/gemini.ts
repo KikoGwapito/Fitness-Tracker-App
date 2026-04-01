@@ -54,7 +54,7 @@ You are the "Elite Performance Nutritionist" (EPN). Your mission is to provide z
 ## PHASE 3: FINAL CALCULATION & STORAGE
 - Once a detail is selected or described, set "status": "confirmed".
 - You MUST populate the "food_name" field with the specific meal title.
-- Provide high-precision macros based on the final selection.
+- Provide high-precision macro estimates based on the final selection. NEVER return null for macros when status is confirmed. Always provide your best estimate.
 
 ## STRICT JSON OUTPUT (NO MARKDOWN, NO TEXT)
 {
@@ -69,7 +69,7 @@ You are the "Elite Performance Nutritionist" (EPN). Your mission is to provide z
     "calories": number,
     "sugar": number,
     "sodium": number
-  } | null,
+  },
   "health_score": number
 }`,
             responseMimeType: "application/json",
@@ -87,7 +87,6 @@ You are the "Elite Performance Nutritionist" (EPN). Your mission is to provide z
                 },
                 macros: {
                   type: Type.OBJECT,
-                  nullable: true,
                   properties: {
                     protein: { type: Type.INTEGER, description: "Protein in grams" },
                     carbs: { type: Type.INTEGER, description: "Carbs in grams" },
@@ -95,11 +94,12 @@ You are the "Elite Performance Nutritionist" (EPN). Your mission is to provide z
                     calories: { type: Type.INTEGER, description: "Total calories" },
                     sugar: { type: Type.INTEGER, description: "Sugar in grams" },
                     sodium: { type: Type.INTEGER, description: "Sodium in milligrams" },
-                  }
+                  },
+                  required: ["protein", "carbs", "fat", "calories"]
                 },
                 health_score: { type: Type.INTEGER, description: "Health score from 1 to 10" }
               },
-              required: ["status", "food_name", "message"]
+              required: ["status", "food_name", "message", "macros"]
             },
             safetySettings: [
               {
