@@ -52,6 +52,8 @@ export interface FoodLog {
   reason?: string;
   image_url?: string;
   isValidated?: boolean;
+  isPinned?: boolean;
+  deletedFromLogs?: boolean;
 }
 
 export interface Todo {

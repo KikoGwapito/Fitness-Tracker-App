@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Plus, Activity, Flame, Droplets, Beef, X, Loader2, MessageSquare, Image as ImageIcon, LogOut, LogIn, ChevronRight, Sparkles, Apple } from 'lucide-react';
+import { Camera, Plus, Activity, Flame, Droplets, Beef, X, Loader2, MessageSquare, Image as ImageIcon, LogOut, LogIn, ChevronRight, Sparkles, Apple, Star } from 'lucide-react';
 import { analyzeMeal } from './lib/gemini';
 import { FoodLog, DailyGoals, UserProfile, UserSettings } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -16,6 +16,7 @@ import { UserProfileScreen } from './pages/UserProfileScreen';
 import { BasicInfoScreen } from './pages/BasicInfoScreen';
 import { MenuScreen } from './pages/Menu';
 import { AppInfo } from './pages/AppInfo';
+import { FavoritesScreen } from './pages/Favorites';
 import { ConfirmModal } from './components/ConfirmModal';
 
 const DEFAULT_GOALS: DailyGoals = {
@@ -32,7 +33,7 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
-  const [subPage, setSubPage] = useState<'none' | 'profile' | 'basic-info' | 'app-info'>('none');
+  const [subPage, setSubPage] = useState<'none' | 'profile' | 'basic-info' | 'app-info' | 'favorites'>('none');
 
   // Apply Settings
   useEffect(() => {
@@ -72,6 +73,7 @@ export default function App() {
     reason: string;
     quick_options: string[] | null;
     data: any;
+    isConfirmed?: boolean;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -141,7 +143,9 @@ export default function App() {
     setSubPage('none');
   };
 
-  const todayLogs = logs.filter(log => {
+  const activeLogs = logs.filter(log => !log.deletedFromLogs);
+
+  const todayLogs = activeLogs.filter(log => {
     const today = new Date().setHours(0, 0, 0, 0);
     const logDate = new Date(log.timestamp).setHours(0, 0, 0, 0);
     return today === logDate;
@@ -179,6 +183,7 @@ export default function App() {
 
   const handleDeleteLog = async (logId: string) => {
     if (!user) return;
+    const logToDelete = logs.find(l => l.id === logId);
     setConfirmModal({
       isOpen: true,
       title: 'Delete Meal',
@@ -186,13 +191,31 @@ export default function App() {
       variant: 'danger',
       onConfirm: async () => {
         try {
-          await firebaseService.deleteMealFromFirebase(user.uid, logId);
+          if (logToDelete?.isPinned) {
+            await firebaseService.updateMealInFirebase(user.uid, logId, { deletedFromLogs: true });
+          } else {
+            await firebaseService.deleteMealFromFirebase(user.uid, logId);
+          }
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } catch (error) {
           console.error('Delete failed:', error);
         }
       }
     });
+  };
+
+  const handleRemoveFavorites = async (foodNames: string[]) => {
+    if (!user) return;
+    const lowerNames = foodNames.map(n => n.toLowerCase());
+    const logsToUpdate = logs.filter(l => l.isPinned && lowerNames.includes((l.foodName || l.food_name || '').toLowerCase()));
+    
+    for (const log of logsToUpdate) {
+      if (log.deletedFromLogs) {
+        await firebaseService.deleteMealFromFirebase(user.uid, log.id);
+      } else {
+        await firebaseService.updateMealInFirebase(user.uid, log.id, { isPinned: false });
+      }
+    }
   };
 
   const handleEditLog = (log: FoodLog) => {
@@ -255,30 +278,48 @@ export default function App() {
         return;
       }
 
-      if (result.status === 'pending') {
+      if (result.status === 'pending' || result.status === 'confirmed') {
+        // If confirmed, we inject the favorite options manually
+        const options = result.status === 'confirmed' 
+          ? ["Log Meal Only", "Log & Add to Favorites"]
+          : result.quick_options || null;
+
         setPendingAnalysis({
           clarification_required: result.message || "Please provide more details.",
-          reason: "Dynamic Identification Phase",
-          quick_options: result.quick_options || null,
-          data: null
+          reason: result.status === 'confirmed' ? "Final Confirmation" : "Dynamic Identification Phase",
+          quick_options: options,
+          data: { ...result, finalImageUrl },
+          isConfirmed: result.status === 'confirmed'
         });
         setIsAnalyzing(false);
         return;
       }
 
+      await saveConfirmedMeal(result, finalImageUrl, false);
+    } catch (error: any) {
+      console.error('Analysis failed:', error);
+      alert(`Failed to analyze meal: ${error.message || 'Unknown error'}. Please try again.`);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const saveConfirmedMeal = async (result: any, finalImageUrl: string | null, isPinned: boolean) => {
+    try {
       const mealData = {
         food_name: result.food_name || textInput || "Logged Meal",
-        calories: result.macros?.calories || 0,
-        protein: result.macros?.protein || 0,
-        carbs: result.macros?.carbs || 0,
-        fat: result.macros?.fat || 0,
-        sugar_g: result.macros?.sugar || 0,
-        sodium_mg: result.macros?.sodium || 0,
+        calories: result.macros?.cal || result.macros?.calories || 0,
+        protein: result.macros?.p || result.macros?.protein || 0,
+        carbs: result.macros?.c || result.macros?.carbs || 0,
+        fat: result.macros?.f || result.macros?.fat || 0,
+        sugar_g: result.macros?.sugar_g || result.macros?.sugar || 0,
+        sodium_mg: result.macros?.sodium_mg || result.macros?.sodium || 0,
         health_score: result.health_score || 10,
         coach_tip: result.message || "Great job logging your meal!",
         status: result.status,
         clarification_required: null,
-        reason: null
+        reason: null,
+        isPinned
       };
       
       if (editingLog) {
@@ -306,10 +347,8 @@ export default function App() {
       setSelectedImage(null);
       setImageMimeType(null);
     } catch (error: any) {
-      console.error('Analysis failed:', error);
-      alert(`Failed to analyze meal: ${error.message || 'Unknown error'}. Please try again.`);
-    } finally {
-      setIsAnalyzing(false);
+      console.error('Failed to save meal:', error);
+      alert(`Failed to save meal: ${error.message || 'Unknown error'}. Please try again.`);
     }
   };
 
@@ -318,6 +357,59 @@ export default function App() {
   const handleUpdateSettings = async (settings: UserSettings) => {
     if (!user) return;
     await firebaseService.updateProfileSettings(user.uid, settings);
+  };
+
+  const handleLogFavorite = async (log: FoodLog) => {
+    if (!user) return;
+    
+    // We can just save it directly as a new meal for today
+    const mealData = {
+      food_name: log.foodName || log.food_name,
+      calories: log.macros.calories,
+      protein: log.macros.protein,
+      carbs: log.macros.carbs,
+      fat: log.macros.fat,
+      sugar_g: log.sugar_g || 0,
+      sodium_mg: log.sodium_mg || 0,
+      health_score: log.health_score || 0,
+      coach_tip: "Logged from favorites! Stay consistent.",
+      status: 'confirmed',
+      clarification_required: null,
+      reason: null,
+      isPinned: true, // Keep it pinned
+    };
+
+    try {
+      await firebaseService.saveMealToFirebase(user.uid, {
+        ...mealData,
+        image_url: log.image_url
+      }, true);
+      
+      // Navigate back to dashboard to see the logged meal
+      setSubPage('none');
+      setActiveTab('dashboard');
+    } catch (error: any) {
+      console.error('Failed to log favorite meal:', error);
+      alert(`Failed to log meal: ${error.message || 'Unknown error'}. Please try again.`);
+    }
+  };
+
+  const handleToggleFavorite = async (logId: string, currentPinnedStatus: boolean) => {
+    if (!user) return;
+    try {
+      const targetLog = logs.find(l => l.id === logId);
+      if (!targetLog) return;
+      
+      const foodNameLower = (targetLog.foodName || targetLog.food_name || '').toLowerCase();
+      const matchingLogs = logs.filter(l => (l.foodName || l.food_name || '').toLowerCase() === foodNameLower);
+      
+      const updatePromises = matchingLogs.map(l => 
+        firebaseService.updateMealInFirebase(user.uid, l.id, { isPinned: !currentPinnedStatus })
+      );
+      await Promise.all(updatePromises);
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+    }
   };
 
   if (!isAuthReady) {
@@ -356,9 +448,9 @@ export default function App() {
   }
 
   return (
-    <div className="fixed inset-0 bg-bg text-ink font-sans selection:bg-accent/30 flex justify-center">
-      {/* Mobile-first container */}
-      <div className="w-full max-w-md h-[100dvh] flex flex-col relative bg-bg overflow-hidden">
+    <div className="fixed inset-0 bg-bg text-ink font-sans selection:bg-accent/30 flex justify-center md:bg-black/90">
+      {/* Mobile-first container, centered on desktop */}
+      <div className="w-full max-w-md h-[100dvh] flex flex-col relative bg-bg overflow-hidden md:border-x md:border-white/10 md:shadow-2xl">
         
         {/* App Header */}
         <header className="px-6 py-4 border-b border-white/5 flex items-center justify-center">
@@ -371,19 +463,28 @@ export default function App() {
           <Dashboard 
             user={user} 
             profile={profile} 
-            logs={logs} 
+            logs={activeLogs} 
             onDeleteLog={handleDeleteLog} 
             onEditLog={handleEditLog} 
+            onToggleFavorite={handleToggleFavorite}
           />
         )}
-        {activeTab === 'history' && <History logs={logs} onEditLog={handleEditLog} onDeleteLog={handleDeleteLog} profile={profile} />}
-        {activeTab === 'progress' && <Progress logs={logs} profile={profile} />}
+        {activeTab === 'history' && (
+          <History 
+            logs={activeLogs} 
+            onEditLog={handleEditLog} 
+            onDeleteLog={handleDeleteLog} 
+            profile={profile} 
+            onToggleFavorite={handleToggleFavorite}
+          />
+        )}
+        {activeTab === 'progress' && <Progress logs={activeLogs} profile={profile} />}
         
         {activeTab === 'menu' && subPage === 'none' && (
           <MenuScreen 
             userEmail={user?.email || ''}
             profile={profile}
-            logs={logs}
+            logs={activeLogs}
             onNavigate={setSubPage} 
             onLogout={handleLogout} 
             onUpdateSettings={handleUpdateSettings}
@@ -405,6 +506,14 @@ export default function App() {
         )}
         {activeTab === 'menu' && subPage === 'app-info' && (
           <AppInfo onBack={() => setSubPage('none')} />
+        )}
+        {activeTab === 'menu' && subPage === 'favorites' && (
+          <FavoritesScreen 
+            logs={logs} 
+            onBack={() => setSubPage('none')} 
+            onLogFavorite={handleLogFavorite}
+            onRemoveFavorites={handleRemoveFavorites}
+          />
         )}
 
         <BottomNav 
@@ -497,7 +606,9 @@ export default function App() {
                         <div className="p-2 bg-notify/10 rounded-lg">
                           <MessageSquare className="w-5 h-5 text-notify" />
                         </div>
-                        <h3 className="text-sm font-display uppercase tracking-widest text-notify">AI Coach Question</h3>
+                        <h3 className="text-sm font-display uppercase tracking-widest text-notify">
+                          {pendingAnalysis.isConfirmed ? "AI Coach Insight" : "AI Coach Question"}
+                        </h3>
                       </div>
                       <p className="text-lg font-display uppercase leading-tight text-white mb-2">
                         {pendingAnalysis.clarification_required}
@@ -507,54 +618,90 @@ export default function App() {
                       </p>
                     </div>
 
-                    <div className="space-y-3">
-                      {pendingAnalysis.quick_options && pendingAnalysis.quick_options.length > 0 && (
-                        <div className="flex flex-col gap-2 mb-4">
-                          <label className="text-[10px] font-display uppercase tracking-widest text-ink/40">Quick Answers</label>
-                          {pendingAnalysis.quick_options.map((option, idx) => (
+                    {pendingAnalysis.isConfirmed ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="vonas-card bg-white/5 p-4 flex flex-col items-center justify-center">
+                            <span className="text-2xl font-display text-accent">{pendingAnalysis.data.macros?.cal || pendingAnalysis.data.macros?.calories || 0}</span>
+                            <span className="text-[10px] font-display uppercase tracking-widest text-ink/40">Calories</span>
+                          </div>
+                          <div className="vonas-card bg-white/5 p-4 flex flex-col items-center justify-center">
+                            <span className="text-2xl font-display text-white">{pendingAnalysis.data.macros?.p || pendingAnalysis.data.macros?.protein || 0}g</span>
+                            <span className="text-[10px] font-display uppercase tracking-widest text-ink/40">Protein</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-3 mt-6">
+                          {pendingAnalysis.quick_options?.map((option, idx) => (
                             <button
                               key={idx}
-                              onClick={() => performAnalysis(option)}
-                              className="w-full text-left px-5 py-4 bg-white/5 hover:bg-accent/10 border border-white/10 hover:border-accent/50 rounded-2xl text-sm font-display uppercase tracking-wider text-white transition-all duration-300 flex items-center justify-between group"
+                              onClick={() => {
+                                const isPinned = option.includes("Favorite");
+                                saveConfirmedMeal(pendingAnalysis.data, pendingAnalysis.data.finalImageUrl, isPinned);
+                              }}
+                              className={cn(
+                                "w-full py-4 rounded-2xl text-sm font-display uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2",
+                                option.includes("Favorite") 
+                                  ? "bg-accent text-bg hover:bg-accent/90" 
+                                  : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
+                              )}
                             >
-                              <span>{option}</span>
-                              <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-accent transition-colors" />
+                              {option}
                             </button>
                           ))}
                         </div>
-                      )}
-                      
-                      <label className="text-[10px] font-display uppercase tracking-widest text-ink/40">Or type your answer</label>
-                      <textarea 
-                        autoFocus
-                        placeholder="e.g., It was grilled dry, no oil used."
-                        className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-5 text-white placeholder:text-ink/20 focus:outline-none focus:border-accent resize-none transition-all font-light"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            performAnalysis((e.target as HTMLTextAreaElement).value);
-                          }
-                        }}
-                      />
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {pendingAnalysis.quick_options && pendingAnalysis.quick_options.length > 0 && (
+                          <div className="flex flex-col gap-2 mb-4">
+                            <label className="text-[10px] font-display uppercase tracking-widest text-ink/40">Quick Answers</label>
+                            {pendingAnalysis.quick_options.map((option, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => performAnalysis(option)}
+                                className="w-full text-left px-5 py-4 bg-white/5 hover:bg-accent/10 border border-white/10 hover:border-accent/50 rounded-2xl text-sm font-display uppercase tracking-wider text-white transition-all duration-300 flex items-center justify-between group"
+                              >
+                                <span>{option}</span>
+                                <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-accent transition-colors" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <label className="text-[10px] font-display uppercase tracking-widest text-ink/40">Or type your answer</label>
+                        <textarea 
+                          autoFocus
+                          placeholder="e.g., It was grilled dry, no oil used."
+                          className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-5 text-white placeholder:text-ink/20 focus:outline-none focus:border-accent resize-none transition-all font-light"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              performAnalysis((e.target as HTMLTextAreaElement).value);
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
 
-                    <div className="flex gap-4">
-                      <button 
-                        onClick={() => setPendingAnalysis(null)}
-                        className="vonas-button flex-1 py-4 text-white/40 hover:text-white"
-                      >
-                        Back
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const textarea = document.querySelector('textarea');
-                          if (textarea) performAnalysis(textarea.value);
-                        }}
-                        className="vonas-button vonas-button-primary flex-[2] py-4"
-                      >
-                        Confirm Details
-                      </button>
-                    </div>
+                    {!pendingAnalysis.isConfirmed && (
+                      <div className="flex gap-4">
+                        <button 
+                          onClick={() => setPendingAnalysis(null)}
+                          className="vonas-button flex-1 py-4 text-white/40 hover:text-white"
+                        >
+                          Back
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const textarea = document.querySelector('textarea');
+                            if (textarea) performAnalysis(textarea.value);
+                          }}
+                          className="vonas-button vonas-button-primary flex-[2] py-4"
+                        >
+                          Confirm Details
+                        </button>
+                      </div>
+                    )}
                   </motion.div>
                 ) : (
                   <>
@@ -607,7 +754,7 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="mt-auto pt-6 pb-safe">
+                    <div className="mt-auto pt-6 pb-safe flex flex-col gap-3">
                       <button 
                         onClick={() => performAnalysis()}
                         disabled={isAnalyzing || (!textInput && !selectedImage && !editingLog)}
@@ -625,6 +772,20 @@ export default function App() {
                           </>
                         )}
                       </button>
+                      
+                      {!editingLog && (
+                        <button 
+                          onClick={() => {
+                            setIsLogging(false);
+                            setActiveTab('menu');
+                            setSubPage('favorites');
+                          }}
+                          className="vonas-button w-full py-5 bg-white/5 text-white hover:bg-white/10 border border-white/10"
+                        >
+                          <Star className="w-5 h-5 text-accent" />
+                          <span>Choose from Favorites</span>
+                        </button>
+                      )}
                     </div>
                   </>
                 )}

@@ -49,12 +49,12 @@ class FirebaseService {
     const data: any = {
       userId: uid,
       timestamp: serverTimestamp(), // Ensure the Timestamp is automatically added to every entry
-      foodName: mealData.food_name || mealData.foodName,
+      foodName: mealData.food_name || mealData.foodName || "Logged Meal",
       macros: {
-        calories: mealData.calories,
-        protein: mealData.protein_g || mealData.protein,
-        carbs: mealData.carbs_g || mealData.carbs,
-        fat: mealData.fat_g || mealData.fat,
+        calories: mealData.calories || 0,
+        protein: mealData.protein_g || mealData.protein || 0,
+        carbs: mealData.carbs_g || mealData.carbs || 0,
+        fat: mealData.fat_g || mealData.fat || 0,
       },
       isValidated: isValidated,
       // Including additional fields required for app functionality
@@ -68,6 +68,7 @@ class FirebaseService {
     if (mealData.image_url) data.image_url = mealData.image_url;
     if (mealData.clarification_required) data.clarification_required = mealData.clarification_required;
     if (mealData.reason) data.reason = mealData.reason;
+    if (mealData.isPinned !== undefined) data.isPinned = mealData.isPinned;
     
     try {
       return await addDoc(logRef, data);
@@ -90,25 +91,34 @@ class FirebaseService {
   async updateMealInFirebase(uid: string, logId: string, mealData: any) {
     const logRef = doc(db, `users/${uid}/food_logs`, logId);
     
-    const data: any = {
-      foodName: mealData.food_name || mealData.foodName,
-      macros: {
-        calories: mealData.calories,
-        protein: mealData.protein_g || mealData.protein,
-        carbs: mealData.carbs_g || mealData.carbs,
-        fat: mealData.fat_g || mealData.fat,
-      },
-      isValidated: mealData.status === 'confirmed',
-      sugar_g: mealData.sugar_g || 0,
-      sodium_mg: mealData.sodium_mg || 0,
-      health_score: mealData.health_score || 0,
-      coach_tip: mealData.coach_tip || "",
-      status: mealData.status || 'confirmed'
-    };
+    const data: any = {};
     
-    if (mealData.image_url) data.image_url = mealData.image_url;
-    if (mealData.clarification_required) data.clarification_required = mealData.clarification_required;
-    if (mealData.reason) data.reason = mealData.reason;
+    if (mealData.food_name !== undefined) data.foodName = mealData.food_name;
+    else if (mealData.foodName !== undefined) data.foodName = mealData.foodName;
+
+    if (mealData.calories !== undefined || mealData.macros !== undefined) {
+      data.macros = {
+        calories: mealData.calories ?? mealData.macros?.calories ?? 0,
+        protein: mealData.protein_g ?? mealData.protein ?? mealData.macros?.protein ?? 0,
+        carbs: mealData.carbs_g ?? mealData.carbs ?? mealData.macros?.carbs ?? 0,
+        fat: mealData.fat_g ?? mealData.fat ?? mealData.macros?.fat ?? 0,
+      };
+    }
+
+    if (mealData.status !== undefined) {
+      data.isValidated = mealData.status === 'confirmed';
+      data.status = mealData.status;
+    }
+    
+    if (mealData.sugar_g !== undefined) data.sugar_g = mealData.sugar_g;
+    if (mealData.sodium_mg !== undefined) data.sodium_mg = mealData.sodium_mg;
+    if (mealData.health_score !== undefined) data.health_score = mealData.health_score;
+    if (mealData.coach_tip !== undefined) data.coach_tip = mealData.coach_tip;
+    if (mealData.image_url !== undefined) data.image_url = mealData.image_url;
+    if (mealData.clarification_required !== undefined) data.clarification_required = mealData.clarification_required;
+    if (mealData.reason !== undefined) data.reason = mealData.reason;
+    if (mealData.isPinned !== undefined) data.isPinned = mealData.isPinned;
+    if (mealData.deletedFromLogs !== undefined) data.deletedFromLogs = mealData.deletedFromLogs;
 
     try {
       await updateDoc(logRef, data);
@@ -168,7 +178,9 @@ class FirebaseService {
           isValidated: data.isValidated,
           status: data.status,
           clarification_required: data.clarification_required,
-          reason: data.reason
+          reason: data.reason,
+          isPinned: data.isPinned || false,
+          deletedFromLogs: data.deletedFromLogs || false
         } as FoodLog);
       });
       callback(logs);

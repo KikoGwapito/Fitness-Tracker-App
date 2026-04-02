@@ -39,44 +39,38 @@ export async function analyzeMeal(imagePart?: { inlineData: { data: string; mime
           contents: { parts },
           config: {
             systemInstruction: `## ROLE
-You are the "Elite Performance Nutritionist" (EPN), a world-class sports dietitian. Your mission is to provide highly accurate, realistic, and zero-friction macro logging for athletes.
+Elite Performance Nutritionist for Gwapitometrics. High-precision macro tracking for athletes.
 
-## PHASE 1: DYNAMIC IDENTIFICATION
-1. Identify the meal name immediately (e.g., "Chicken Inasal Pecho").
-2. CRITICAL: You MUST ask for portion sizes (e.g., grams, cups, pieces) and cooking methods (e.g., fried, baked, steamed) if they are not explicitly clear from the image or text. Do not guess the portion size if it's highly ambiguous. If ambiguous, set "status": "pending".
-3. GENERATE QUICK OPTIONS: Provide 3 likely variations or portion sizes (e.g., "1 cup (150g) cooked", "2 pieces pan-fried", "Large serving with sauce").
-4. THE ANCHOR: The 4th option MUST ALWAYS be "None of these / Show more".
+## PHASE 1: IDENTIFICATION & RECURSIVE LOOP
+1. Identify the meal from image/text. If details are missing, status = "pending".
+2. Provide 3 specific variations based on the input + "None of these / Show more".
+3. IF USER CLICKS "None of these / Show more": Generate 3 NEW, DIFFERENT variations.
 
-## PHASE 2: THE RECURSIVE LOOP
-- If the user selects "None of these / Show more", you must generate 3 NEW, DIFFERENT likely variations of the meal to help them find the right one.
-- Continue this loop until a selection is made or the user provides a manual text description.
+## PHASE 2: DATA CALCULATION
+Once the user confirms a choice or describes the meal, set status = "confirmed" and calculate:
+- PRIMARY: Protein (p), Carbs (c), Fats (f), Calories (cal).
+- SECONDARY: Sugar (sugar_g), Sodium (sodium_mg).
+- SCORE: Provide a natural health score from 1 to 10 (health_score).
 
-## PHASE 3: FINAL CALCULATION & STORAGE (CRITICAL ACCURACY)
-- Once a detail is selected or described, set "status": "confirmed".
-- You MUST populate the "food_name" field with the specific meal title.
-- MACRO ACCURACY RULES:
-  1. Base your estimates on standard USDA nutritional databases.
-  2. Account for hidden calories: cooking oils, butter, sauces, and marinades. If the cooking method is unknown but the food looks fried or sauteed, add 10-15g of fat for oil.
-  3. Account for raw vs. cooked weight differences (e.g., meat shrinks, rice expands).
-  4. MATHEMATICAL CONSISTENCY: Your calories MUST roughly equal (Protein * 4) + (Carbs * 4) + (Fat * 9). Do not hallucinate impossible macro ratios.
-  5. NEVER return null for macros when status is confirmed. Always provide your most scientifically accurate estimate.
-- In the "message" field, briefly explain your calculation (e.g., "Logged! I included an estimated 1 tbsp of cooking oil in the fat macros.").
+## PHASE 3: OUTPUT MAPPING
+- "food_name" MUST be specific (e.g., "Chicken Inasal with Java Rice").
+- "message" should be a short, supportive coach insight.
 
-## STRICT JSON OUTPUT (NO MARKDOWN, NO TEXT)
+## STRICT JSON ONLY (NO MARKDOWN)
 {
-  "status": "pending" | "confirmed" | "error",
-  "food_name": "Name of the meal",
-  "message": "Short coach question or confirmation",
-  "quick_options": ["Option 1", "Option 2", "Option 3", "None of these / Show more"] | null,
+  "status": "pending" | "confirmed",
+  "food_name": "String",
+  "message": "String",
+  "health_score": number,
+  "quick_options": ["Option 1", "Option 2", "Option 3", "None of these / Show more"],
   "macros": {
-    "protein": number,
-    "carbs": number,
-    "fat": number,
-    "calories": number,
-    "sugar": number,
-    "sodium": number
-  },
-  "health_score": number
+    "p": number,
+    "c": number,
+    "f": number,
+    "cal": number,
+    "sugar_g": number,
+    "sodium_mg": number
+  }
 }`,
             responseMimeType: "application/json",
             responseSchema: {
@@ -84,7 +78,8 @@ You are the "Elite Performance Nutritionist" (EPN), a world-class sports dietiti
               properties: {
                 status: { type: Type.STRING, enum: ["pending", "confirmed", "error"], description: "Status of the analysis" },
                 food_name: { type: Type.STRING, description: "Name of the meal" },
-                message: { type: Type.STRING, description: "Short coach question or confirmation" },
+                message: { type: Type.STRING, description: "Short coach insight" },
+                health_score: { type: Type.INTEGER, description: "Health score from 1 to 10" },
                 quick_options: {
                   type: Type.ARRAY,
                   nullable: true,
@@ -94,16 +89,15 @@ You are the "Elite Performance Nutritionist" (EPN), a world-class sports dietiti
                 macros: {
                   type: Type.OBJECT,
                   properties: {
-                    protein: { type: Type.INTEGER, description: "Protein in grams" },
-                    carbs: { type: Type.INTEGER, description: "Carbs in grams" },
-                    fat: { type: Type.INTEGER, description: "Fat in grams" },
-                    calories: { type: Type.INTEGER, description: "Total calories" },
-                    sugar: { type: Type.INTEGER, description: "Sugar in grams" },
-                    sodium: { type: Type.INTEGER, description: "Sodium in milligrams" },
+                    p: { type: Type.INTEGER, description: "Protein in grams" },
+                    c: { type: Type.INTEGER, description: "Carbs in grams" },
+                    f: { type: Type.INTEGER, description: "Fat in grams" },
+                    cal: { type: Type.INTEGER, description: "Total calories" },
+                    sugar_g: { type: Type.INTEGER, description: "Sugar in grams" },
+                    sodium_mg: { type: Type.INTEGER, description: "Sodium in milligrams" },
                   },
-                  required: ["protein", "carbs", "fat", "calories", "sugar", "sodium"]
-                },
-                health_score: { type: Type.INTEGER, description: "Health score from 1 to 10" }
+                  required: ["p", "c", "f", "cal", "sugar_g", "sodium_mg"]
+                }
               },
               required: ["status", "food_name", "message", "macros"]
             },

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
-import { ChevronLeft, ChevronRight, Flame, Beef, Pencil, Trash2, Droplets, Activity, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flame, Beef, Pencil, Trash2, Droplets, Activity, ChevronDown, ChevronUp, AlertCircle, Star } from 'lucide-react';
 import { FoodLog, DailyGoals, UserProfile } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -11,9 +11,10 @@ interface HistoryProps {
   onEditLog: (log: FoodLog) => void;
   onDeleteLog: (logId: string) => void;
   profile: UserProfile | null;
+  onToggleFavorite: (logId: string, currentPinnedStatus: boolean) => void;
 }
 
-export function History({ logs, onEditLog, onDeleteLog, profile }: HistoryProps) {
+export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorite }: HistoryProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isMealsOpen, setIsMealsOpen] = useState(false);
@@ -322,6 +323,15 @@ export function History({ logs, onEditLog, onDeleteLog, profile }: HistoryProps)
                             {log.health_score}
                           </div>
                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => onToggleFavorite(log.id, !!log.isPinned)}
+                              className={cn(
+                                "p-1.5 rounded-lg transition-colors",
+                                log.isPinned ? "bg-accent/10 text-accent hover:bg-accent/20" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-accent"
+                              )}
+                            >
+                              <Star className={cn("w-3 h-3", log.isPinned && "fill-accent")} />
+                            </button>
                             <button 
                               onClick={() => onEditLog(log)}
                               className="p-1.5 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-lg transition-colors"

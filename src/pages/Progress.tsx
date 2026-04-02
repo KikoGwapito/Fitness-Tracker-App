@@ -186,7 +186,7 @@ export function Progress({ logs, profile }: ProgressProps) {
           <h3 className="text-sm font-display uppercase tracking-widest text-white">Calorie Trend</h3>
         </div>
         <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis 
@@ -230,7 +230,7 @@ export function Progress({ logs, profile }: ProgressProps) {
           <h3 className="text-sm font-display uppercase tracking-widest text-white">Macro Distribution</h3>
         </div>
         <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis 

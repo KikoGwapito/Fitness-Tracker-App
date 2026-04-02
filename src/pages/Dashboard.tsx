@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Flame, Beef, Droplets, MessageSquare, Trash2, Edit2 } from 'lucide-react';
+import { Activity, Flame, Beef, Droplets, MessageSquare, Trash2, Edit2, Star } from 'lucide-react';
 import { motion } from 'motion/react';
 import { MacroRing } from '../components/MacroRing';
 import { FoodLog, DailyGoals, UserProfile } from '../types';
@@ -12,9 +12,10 @@ interface DashboardProps {
   logs: FoodLog[];
   onDeleteLog: (logId: string) => void;
   onEditLog: (log: FoodLog) => void;
+  onToggleFavorite: (logId: string, currentPinnedStatus: boolean) => void;
 }
 
-export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog }: DashboardProps) {
+export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggleFavorite }: DashboardProps) {
   const todayLogs = logs.filter(log => {
     const today = new Date().setHours(0, 0, 0, 0);
     const logDate = new Date(log.timestamp).setHours(0, 0, 0, 0);
@@ -241,6 +242,15 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog }: Dashb
                   </div>
                 </div>
                 <div className="flex justify-end gap-4 mt-4 pt-4 border-t border-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => onToggleFavorite(log.id, !!log.isPinned)}
+                    className={cn(
+                      "flex items-center gap-2 text-[10px] font-display uppercase tracking-widest transition-colors",
+                      log.isPinned ? "text-accent hover:text-accent/80" : "text-white/40 hover:text-accent"
+                    )}
+                  >
+                    <Star className={cn("w-3 h-3", log.isPinned && "fill-accent")} /> {log.isPinned ? "Favorited" : "Favorite"}
+                  </button>
                   <button 
                     onClick={() => onEditLog(log)}
                     className="flex items-center gap-2 text-[10px] font-display uppercase tracking-widest text-white/40 hover:text-white transition-colors"
