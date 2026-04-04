@@ -90,6 +90,14 @@ export default function App() {
     onConfirm: () => {},
   });
 
+  const mainContentRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (mainContentRef.current) {
+      mainContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [activeTab, subPage]);
+
   // Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -141,6 +149,9 @@ export default function App() {
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
     setSubPage('none');
+    if (mainContentRef.current) {
+      mainContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const activeLogs = logs.filter(log => !log.deletedFromLogs);
@@ -448,74 +459,10 @@ export default function App() {
   }
 
   return (
-    <div className="fixed inset-0 bg-bg text-ink font-sans selection:bg-accent/30 flex justify-center md:bg-black/90">
-      {/* Mobile-first container, centered on desktop */}
-      <div className="w-full max-w-md h-[100dvh] flex flex-col relative bg-bg overflow-hidden md:border-x md:border-white/10 md:shadow-2xl">
+    <div className="fixed inset-0 bg-bg text-ink font-sans selection:bg-accent/30 flex justify-center">
+      {/* Main container */}
+      <div className="w-full h-[100dvh] flex flex-col md:flex-row relative bg-bg overflow-hidden">
         
-        {/* App Header */}
-        <header className="px-6 py-4 border-b border-white/5 flex items-center justify-center">
-          <h1 className="text-xl font-display uppercase tracking-[0.2em] text-white">
-            G-<span className="text-accent font-light">Refine</span>
-          </h1>
-        </header>
-
-        {activeTab === 'dashboard' && (
-          <Dashboard 
-            user={user} 
-            profile={profile} 
-            logs={activeLogs} 
-            onDeleteLog={handleDeleteLog} 
-            onEditLog={handleEditLog} 
-            onToggleFavorite={handleToggleFavorite}
-          />
-        )}
-        {activeTab === 'history' && (
-          <History 
-            logs={activeLogs} 
-            onEditLog={handleEditLog} 
-            onDeleteLog={handleDeleteLog} 
-            profile={profile} 
-            onToggleFavorite={handleToggleFavorite}
-          />
-        )}
-        {activeTab === 'progress' && <Progress logs={activeLogs} profile={profile} />}
-        
-        {activeTab === 'menu' && subPage === 'none' && (
-          <MenuScreen 
-            userEmail={user?.email || ''}
-            profile={profile}
-            logs={activeLogs}
-            onNavigate={setSubPage} 
-            onLogout={handleLogout} 
-            onUpdateSettings={handleUpdateSettings}
-          />
-        )}
-        {activeTab === 'menu' && subPage === 'profile' && (
-          <UserProfileScreen 
-            user={user} 
-            profile={profile} 
-            onBack={() => setSubPage('none')} 
-          />
-        )}
-        {activeTab === 'menu' && subPage === 'basic-info' && (
-          <BasicInfoScreen 
-            user={user} 
-            profile={profile} 
-            onBack={() => setSubPage('none')} 
-          />
-        )}
-        {activeTab === 'menu' && subPage === 'app-info' && (
-          <AppInfo onBack={() => setSubPage('none')} />
-        )}
-        {activeTab === 'menu' && subPage === 'favorites' && (
-          <FavoritesScreen 
-            logs={logs} 
-            onBack={() => setSubPage('none')} 
-            onLogFavorite={handleLogFavorite}
-            onRemoveFavorites={handleRemoveFavorites}
-          />
-        )}
-
         <BottomNav 
           activeTab={activeTab} 
           onChange={handleTabChange} 
@@ -526,6 +473,75 @@ export default function App() {
             setIsLogging(true);
           }} 
         />
+
+        {/* Content Area */}
+        <div className="flex-1 flex flex-col relative overflow-hidden">
+          {/* App Header */}
+          <header className="px-6 py-4 border-b border-white/5 flex items-center justify-center md:justify-start">
+            <h1 className="text-xl font-display uppercase tracking-[0.2em] text-white">
+              G-<span className="text-accent font-light">Refine</span>
+            </h1>
+          </header>
+
+          <main ref={mainContentRef} className="flex-1 overflow-y-auto pb-24 md:pb-0 relative">
+            {activeTab === 'dashboard' && (
+              <Dashboard 
+                user={user} 
+                profile={profile} 
+                logs={activeLogs} 
+                onDeleteLog={handleDeleteLog} 
+                onEditLog={handleEditLog} 
+                onToggleFavorite={handleToggleFavorite}
+              />
+            )}
+            {activeTab === 'history' && (
+              <History 
+                logs={activeLogs} 
+                onEditLog={handleEditLog} 
+                onDeleteLog={handleDeleteLog} 
+                profile={profile} 
+                onToggleFavorite={handleToggleFavorite}
+              />
+            )}
+            {activeTab === 'progress' && <Progress logs={activeLogs} profile={profile} />}
+            
+            {activeTab === 'menu' && subPage === 'none' && (
+              <MenuScreen 
+                userEmail={user?.email || ''}
+                profile={profile}
+                logs={activeLogs}
+                onNavigate={setSubPage} 
+                onLogout={handleLogout} 
+                onUpdateSettings={handleUpdateSettings}
+              />
+            )}
+            {activeTab === 'menu' && subPage === 'profile' && (
+              <UserProfileScreen 
+                user={user} 
+                profile={profile} 
+                onBack={() => setSubPage('none')} 
+              />
+            )}
+            {activeTab === 'menu' && subPage === 'basic-info' && (
+              <BasicInfoScreen 
+                user={user} 
+                profile={profile} 
+                onBack={() => setSubPage('none')} 
+              />
+            )}
+            {activeTab === 'menu' && subPage === 'app-info' && (
+              <AppInfo onBack={() => setSubPage('none')} />
+            )}
+            {activeTab === 'menu' && subPage === 'favorites' && (
+              <FavoritesScreen 
+                logs={logs} 
+                onBack={() => setSubPage('none')} 
+                onLogFavorite={handleLogFavorite}
+                onRemoveFavorites={handleRemoveFavorites}
+              />
+            )}
+          </main>
+        </div>
 
         {/* Logging Modal */}
         <AnimatePresence>
@@ -580,7 +596,7 @@ export default function App() {
                 )}
               </AnimatePresence>
 
-              <div className="px-6 pt-12 pb-4 flex items-center justify-between border-b border-white/5">
+              <div className="px-6 pt-12 pb-4 flex items-center justify-between border-b border-white/5 max-w-2xl mx-auto w-full">
                 <h2 className="text-2xl font-display uppercase text-white">{editingLog ? 'Edit Meal' : 'Log Meal'}</h2>
                 <button 
                   onClick={() => {
@@ -593,7 +609,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8 relative">
+              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8 relative max-w-2xl mx-auto w-full">
                 
                 {pendingAnalysis ? (
                   <motion.div 

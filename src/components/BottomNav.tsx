@@ -30,7 +30,7 @@ export function BottomNav({ activeTab, onChange, onSnapClick }: BottomNavProps) 
         key={tab.id}
         onClick={() => onChange(tab.id)}
         className={cn(
-          "flex flex-col items-center justify-center w-16 h-full gap-1 transition-all duration-300 relative group",
+          "flex flex-col items-center justify-center w-16 h-full md:w-full md:h-16 gap-1 transition-all duration-300 relative group",
           isActive ? "text-accent" : "text-white/20 hover:text-white/40"
         )}
       >
@@ -39,7 +39,7 @@ export function BottomNav({ activeTab, onChange, onSnapClick }: BottomNavProps) 
         {isActive && (
           <motion.div 
             layoutId="activeTab"
-            className="absolute -bottom-1 w-1 h-1 bg-accent rounded-full"
+            className="absolute -bottom-1 md:bottom-auto md:left-0 md:top-1/2 md:-translate-y-1/2 w-1 h-1 md:w-1 md:h-8 bg-accent rounded-full"
           />
         )}
       </button>
@@ -47,14 +47,14 @@ export function BottomNav({ activeTab, onChange, onSnapClick }: BottomNavProps) 
   };
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-bg/80 backdrop-blur-2xl border-t border-white/5 pb-safe z-40">
-      <div className="flex justify-between items-center h-20 px-6 relative">
-        <div className="flex gap-2">
+    <div className="absolute bottom-0 left-0 right-0 md:relative md:w-24 md:h-full bg-bg/80 backdrop-blur-2xl border-t md:border-t-0 md:border-r border-white/5 pb-safe md:pb-0 z-40">
+      <div className="flex md:flex-col justify-between items-center h-20 md:h-full px-6 md:px-0 md:py-8 relative">
+        <div className="flex flex-1 justify-start md:flex-col gap-2 md:gap-6 md:w-full md:items-center">
           {leftTabs.map(renderTab)}
         </div>
 
         {/* Center Snap Button */}
-        <div className="absolute left-1/2 -translate-x-1/2 -top-8">
+        <div className="absolute left-1/2 -translate-x-1/2 -top-8 md:relative md:left-0 md:translate-x-0 md:top-0 md:my-8">
           <motion.button 
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -66,7 +66,7 @@ export function BottomNav({ activeTab, onChange, onSnapClick }: BottomNavProps) 
           </motion.button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-1 justify-end md:flex-col gap-2 md:gap-6 md:w-full md:items-center">
           {rightTabs.map(renderTab)}
         </div>
       </div>

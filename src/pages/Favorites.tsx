@@ -63,7 +63,7 @@ export function FavoritesScreen({ logs, onBack, onLogFavorite, onRemoveFavorites
   };
 
   return (
-    <div className="flex-1 overflow-y-auto pb-32 px-6 pt-12 space-y-8">
+    <div className="flex-1 overflow-y-auto pb-32 px-6 pt-12 space-y-8 max-w-5xl mx-auto w-full">
       <header className="flex flex-col gap-6 mb-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">

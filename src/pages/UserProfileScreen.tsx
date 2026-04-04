@@ -86,7 +86,7 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
   };
 
   return (
-    <div className="flex-1 overflow-y-auto pb-32 px-6 pt-12 space-y-12">
+    <div className="flex-1 overflow-y-auto pb-32 px-6 pt-12 space-y-12 max-w-5xl mx-auto w-full">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button 

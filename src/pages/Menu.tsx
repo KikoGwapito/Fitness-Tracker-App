@@ -57,7 +57,7 @@ export function MenuScreen({ onNavigate, onLogout, onUpdateSettings, userEmail, 
   };
 
   return (
-    <div className="flex-1 overflow-y-auto pb-32 px-6 pt-12 space-y-12">
+    <div className="flex-1 overflow-y-auto pb-32 px-6 pt-12 space-y-12 max-w-5xl mx-auto w-full">
       <AnimatePresence mode="wait">
         {view === 'main' ? (
           <motion.div 

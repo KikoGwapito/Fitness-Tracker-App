@@ -52,7 +52,7 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
   const firstName = profile?.name ? profile.name.split(' ')[0] : 'there';
 
   return (
-    <div className="flex-1 overflow-y-auto pb-32 px-6 space-y-12">
+    <div className="flex-1 overflow-y-auto pb-32 px-6 space-y-12 max-w-5xl mx-auto w-full">
       {/* Header */}
       <header className="pt-12 pb-4 flex items-end justify-between">
         <div>
@@ -90,7 +90,7 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
           </div>
         </div>
         
-        <div className="grid grid-cols-3 gap-4">
+        <div className="flex flex-wrap justify-center gap-4 md:gap-8">
           <MacroRing 
             value={currentTotals.protein_g} 
             max={goals.protein_g} 
@@ -115,42 +115,23 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
             size={90} 
             strokeWidth={6}
           />
-        </div>
-
-        {/* Secondary Macros */}
-        <div className="vonas-card grid grid-cols-2 gap-8">
-          <div className="space-y-2">
-            <div className="flex justify-between items-end">
-              <span className="text-[10px] font-display uppercase tracking-widest text-white/40">Sugar</span>
-              <span className={cn(
-                "text-sm font-display uppercase",
-                currentTotals.sugar_g > goals.sugar_g ? "text-danger" : "text-white"
-              )}>{currentTotals.sugar_g} / {goals.sugar_g}g</span>
-            </div>
-            <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, (currentTotals.sugar_g / goals.sugar_g) * 100)}%` }}
-                className={cn("h-full", currentTotals.sugar_g > goals.sugar_g ? "bg-danger" : "bg-pink-500")}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between items-end">
-              <span className="text-[10px] font-display uppercase tracking-widest text-white/40">Sodium</span>
-              <span className={cn(
-                "text-sm font-display uppercase",
-                currentTotals.sodium_mg > goals.sodium_mg ? "text-danger" : "text-white"
-              )}>{currentTotals.sodium_mg} / {goals.sodium_mg}mg</span>
-            </div>
-            <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, (currentTotals.sodium_mg / goals.sodium_mg) * 100)}%` }}
-                className={cn("h-full", currentTotals.sodium_mg > goals.sodium_mg ? "bg-danger" : "bg-emerald-500")}
-              />
-            </div>
-          </div>
+          <MacroRing 
+            value={currentTotals.sugar_g} 
+            max={goals.sugar_g} 
+            color="#ec4899" 
+            label="Sugar" 
+            size={90} 
+            strokeWidth={6}
+          />
+          <MacroRing 
+            value={currentTotals.sodium_mg} 
+            max={goals.sodium_mg} 
+            color="#10b981" 
+            label="Sodium" 
+            size={90} 
+            strokeWidth={6}
+            unit="mg"
+          />
         </div>
 
         {/* Daily Targets Summary */}

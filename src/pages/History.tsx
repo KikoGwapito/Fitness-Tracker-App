@@ -75,7 +75,7 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
   const isOverAny = chartData.some(d => d.value > d.goal);
 
   return (
-    <div className="flex-1 overflow-y-auto pb-32 px-6 pt-12 space-y-12">
+    <div className="flex-1 overflow-y-auto pb-32 px-6 pt-12 space-y-12 max-w-5xl mx-auto w-full">
       <header>
         <h1 className="text-5xl font-display uppercase leading-none mb-2 animate-slam">
           History <br /> <span className="text-stroke">Archive</span>

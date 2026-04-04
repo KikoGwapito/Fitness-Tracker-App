@@ -29,10 +29,17 @@ export function MacroRing({
   const offset = circumference - percent * circumference;
   
   const displayColor = isOver ? '#ff4444' : color;
+  const filterId = `glow-${label.replace(/\s+/g, '-')}`;
 
   return (
     <div className={cn("relative flex flex-col items-center justify-center group", className)} style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="transform -rotate-90 drop-shadow-[0_0_8px_rgba(0,0,0,0.5)]">
+      <svg width={size} height={size} className="transform -rotate-90 overflow-visible">
+        <defs>
+          <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="8" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -52,13 +59,17 @@ export function MacroRing({
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          className="transition-all duration-1000 ease-out"
+          filter={`url(#${filterId})`}
+          className={cn(
+            "transition-all duration-1000 ease-out",
+            isOver ? "animate-pulse" : "animate-[pulse_3s_ease-in-out_infinite]"
+          )}
         />
       </svg>
       <div className="absolute flex flex-col items-center justify-center text-center transition-transform duration-300 group-hover:scale-110">
         <span className={cn(
           "text-lg font-display uppercase leading-none tracking-tight",
-          isOver ? "text-danger" : "text-white"
+          isOver ? "text-danger drop-shadow-[0_0_8px_rgba(255,68,68,0.8)]" : "text-white"
         )}>
           {Math.round(value)}
         </span>
@@ -67,7 +78,7 @@ export function MacroRing({
         </span>
       </div>
       {isOver && (
-        <div className="absolute -top-1 -right-1 w-2 h-2 bg-danger rounded-full animate-pulse shadow-[0_0_8px_#ff4444]" />
+        <div className="absolute -top-1 -right-1 w-2 h-2 bg-danger rounded-full animate-ping shadow-[0_0_8px_#ff4444]" />
       )}
     </div>
   );
