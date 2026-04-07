@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { UserProfile } from '../types';
 import { User } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -7,6 +7,7 @@ import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { Loader2, Save, ChevronLeft, Camera, Trash2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
+import { COUNTRIES } from '../lib/countries';
 
 interface UserProfileScreenProps {
   user: User;
@@ -23,7 +24,23 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
     name: profile?.name || '',
     username: profile?.username || '',
     profile_picture: profile?.profile_picture || '',
+    country: profile?.country || 'US',
+    language: profile?.language || 'English',
+    birthday: profile?.birthday || '',
   });
+
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        name: profile.name || '',
+        username: profile.username || '',
+        profile_picture: profile.profile_picture || '',
+        country: profile.country || 'US',
+        language: profile.language || 'English',
+        birthday: profile.birthday || '',
+      });
+    }
+  }, [profile]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -76,6 +93,9 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
         name: formData.name,
         username: formData.username,
         profile_picture: formData.profile_picture,
+        country: formData.country,
+        language: formData.language,
+        birthday: formData.birthday,
       });
       setIsEditing(false);
     } catch (error) {
@@ -182,6 +202,69 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
                 {formData.username ? `@${formData.username}` : 'Not set'}
               </div>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Birthday</label>
+            {isEditing ? (
+              <input 
+                type="date" 
+                value={formData.birthday}
+                onChange={e => setFormData({ ...formData, birthday: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+              />
+            ) : (
+              <div className="text-xl font-display text-white">
+                {formData.birthday || '--'}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-8">
+            <div className="space-y-2">
+              <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Country</label>
+              {isEditing ? (
+                <select 
+                  value={formData.country}
+                  onChange={e => {
+                    const country = COUNTRIES.find(c => c.code === e.target.value);
+                    setFormData({ 
+                      ...formData, 
+                      country: e.target.value,
+                      language: country ? country.languages[0] : formData.language
+                    });
+                  }}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light appearance-none"
+                >
+                  {COUNTRIES.map(c => (
+                    <option key={c.code} value={c.code}>{c.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="text-xl font-display text-white">
+                  {COUNTRIES.find(c => c.code === formData.country)?.name || formData.country}
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Language</label>
+              {isEditing ? (
+                <select 
+                  value={formData.language}
+                  onChange={e => setFormData({ ...formData, language: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light appearance-none"
+                >
+                  {(COUNTRIES.find(c => c.code === formData.country)?.languages || ['English']).map(lang => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="text-xl font-display text-white">
+                  {formData.language || '--'}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

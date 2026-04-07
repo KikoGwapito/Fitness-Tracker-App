@@ -51,6 +51,14 @@ service cloud.firestore {
     //   - clarification_required: string (optional)
     //   - reason: string (optional)
     //
+    // Collection: users/{userId}/schedules
+    // Document ID: {date}
+    // Fields:
+    //   - userId: string (required, immutable)
+    //   - date: string (required)
+    //   - text: string (required)
+    //   - createdAt: number (required)
+    //
     // ===============================================================
 
     // ===============================================================
@@ -137,6 +145,15 @@ service cloud.firestore {
              (!('reason' in data) || (data.reason is string));
     }
 
+    function isValidSchedule() {
+      let data = request.resource.data;
+      return hasRequiredFields(['userId', 'date', 'text', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.date is string && data.date.size() == 10 &&
+             data.text is string && data.text.size() <= 5000 &&
+             data.createdAt is number;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -152,6 +169,14 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId) && isValidFoodLog();
         allow update: if isOwner(userId) && isValidFoodLog() && 
+                      request.resource.data.userId == resource.data.userId;
+        allow delete: if isOwner(userId);
+      }
+
+      match /schedules/{date} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidSchedule();
+        allow update: if isOwner(userId) && isValidSchedule() && 
                       request.resource.data.userId == resource.data.userId;
         allow delete: if isOwner(userId);
       }

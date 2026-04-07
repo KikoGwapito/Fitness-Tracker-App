@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
-import { ChevronLeft, ChevronRight, Flame, Beef, Pencil, Trash2, Droplets, Activity, ChevronDown, ChevronUp, AlertCircle, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flame, Beef, Pencil, Trash2, Droplets, Activity, ChevronDown, ChevronUp, AlertCircle, Star, CalendarHeart, Plus } from 'lucide-react';
 import { FoodLog, DailyGoals, UserProfile } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { MealDetailsModal } from '../components/MealDetailsModal';
+import { ScheduleModal } from '../components/ScheduleModal';
+import { useHolidays } from '../lib/useHolidays';
 
 interface HistoryProps {
   logs: FoodLog[];
@@ -12,13 +15,28 @@ interface HistoryProps {
   onDeleteLog: (logId: string) => void;
   profile: UserProfile | null;
   onToggleFavorite: (logId: string, currentPinnedStatus: boolean) => void;
+  schedules?: Record<string, string>;
+  onSaveSchedule?: (date: string, text: string) => void;
 }
 
-export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorite }: HistoryProps) {
+export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorite, schedules = {}, onSaveSchedule }: HistoryProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isMealsOpen, setIsMealsOpen] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [selectedMeal, setSelectedMeal] = useState<FoodLog | null>(null);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (selectedMeal) {
+      const updatedMeal = logs.find(l => l.id === selectedMeal.id);
+      if (updatedMeal) {
+        setSelectedMeal(updatedMeal);
+      } else {
+        setSelectedMeal(null);
+      }
+    }
+  }, [logs]);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -27,6 +45,8 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
 
   const dateFormat = "MMMM yyyy";
   const days = eachDayOfInterval({ start: startDate, end: endDate });
+
+  const { holidays } = useHolidays(profile?.country, currentDate.getFullYear());
 
   const nextMonth = () => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)));
   const prevMonth = () => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)));
@@ -80,7 +100,35 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
         <h1 className="text-5xl font-display uppercase leading-none mb-2 animate-slam">
           History <br /> <span className="text-stroke">Archive</span>
         </h1>
-        <p className="text-[10px] font-display uppercase tracking-widest text-white/40">Review your past performance</p>
+        <p className="text-[10px] font-display uppercase tracking-widest text-white/40 mb-8">Review your past performance</p>
+        
+        <div className="flex items-end justify-between">
+          <div>
+            <button 
+              onClick={() => {
+                const today = new Date();
+                setSelectedDate(today);
+                setCurrentDate(today);
+              }}
+              className="text-3xl font-display uppercase leading-none text-accent hover:text-accent/80 transition-colors text-left"
+            >
+              {isToday(selectedDate) ? 'Today' : format(selectedDate, 'MMM d')}
+            </button>
+            {(() => {
+              const dayString = format(selectedDate, 'yyyy-MM-dd');
+              const holiday = holidays.find(h => h.date === dayString);
+              const isBirthday = profile?.birthday && format(new Date(profile.birthday), 'MM-dd') === format(selectedDate, 'MM-dd');
+              
+              if (isBirthday) {
+                return <p className="text-pink-400 text-xs font-display uppercase tracking-widest mt-2 flex items-center gap-1"><CalendarHeart className="w-3 h-3" /> Happy Birthday!</p>;
+              }
+              if (holiday) {
+                return <p className="text-blue-400 text-xs font-display uppercase tracking-widest mt-2">{holiday.name}</p>;
+              }
+              return null;
+            })()}
+          </div>
+        </div>
       </header>
 
       {/* Calendar */}
@@ -176,6 +224,10 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
             const status = getDayStatus(day);
             const isSelected = isSameDay(day, selectedDate);
             const isCurrentMonth = isSameMonth(day, monthStart);
+            const dayString = format(day, 'yyyy-MM-dd');
+            const holiday = holidays.find(h => h.date === dayString);
+            const isBirthday = profile?.birthday && format(new Date(profile.birthday), 'MM-dd') === format(day, 'MM-dd');
+            const hasSchedule = !!schedules[dayString];
 
             return (
               <button
@@ -186,7 +238,9 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
                   !isCurrentMonth && "text-white/10",
                   isCurrentMonth && !isSelected && "text-white/40 hover:bg-white/5",
                   isSelected && "bg-accent text-bg scale-110",
-                  isToday(day) && !isSelected && "border border-accent/30 text-accent"
+                  isToday(day) && !isSelected && "border border-accent/30 text-accent",
+                  isBirthday && !isSelected && "border border-pink-500/50 text-pink-400",
+                  holiday && !isSelected && !isBirthday && "border border-blue-500/50 text-blue-400"
                 )}
               >
                 {format(day, 'd')}
@@ -195,6 +249,20 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
                     "absolute bottom-1 w-1 h-1 rounded-full",
                     status === 'good' ? "bg-accent" : status === 'high' ? "bg-danger" : "bg-blue-500"
                   )} />
+                )}
+                {isBirthday && isSelected && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-pink-500 rounded-full animate-ping" />
+                )}
+                {isSelected && (
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsScheduleModalOpen(true);
+                    }}
+                    className="absolute -top-2 -right-2 bg-bg border border-white/20 text-accent rounded-full p-1 shadow-lg z-10 hover:bg-white/10 transition-colors"
+                  >
+                    {hasSchedule ? <Pencil className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
+                  </div>
                 )}
               </button>
             );
@@ -205,9 +273,6 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
       {/* Selected Date Summary */}
       <div className="space-y-8">
         <div className="flex items-end justify-between">
-          <h3 className="text-3xl font-display uppercase leading-none">
-            {isToday(selectedDate) ? 'Today' : format(selectedDate, 'MMM d')}
-          </h3>
           <div className="text-[10px] font-display uppercase tracking-widest text-white/40">Daily Performance</div>
         </div>
 
@@ -293,7 +358,11 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
                   </div>
                 ) : (
                   selectedLogs.map(log => (
-                    <div key={log.id} className="vonas-card group">
+                    <div 
+                      key={log.id} 
+                      className="vonas-card group cursor-pointer"
+                      onClick={() => setSelectedMeal(log)}
+                    >
                       <div className="flex gap-4 items-center">
                         <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden relative">
                           {log.image_url ? (
@@ -324,7 +393,7 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
                           </div>
                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button 
-                              onClick={() => onToggleFavorite(log.id, !!log.isPinned)}
+                              onClick={(e) => { e.stopPropagation(); onToggleFavorite(log.id, !!log.isPinned); }}
                               className={cn(
                                 "p-1.5 rounded-lg transition-colors",
                                 log.isPinned ? "bg-accent/10 text-accent hover:bg-accent/20" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-accent"
@@ -333,13 +402,13 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
                               <Star className={cn("w-3 h-3", log.isPinned && "fill-accent")} />
                             </button>
                             <button 
-                              onClick={() => onEditLog(log)}
+                              onClick={(e) => { e.stopPropagation(); onEditLog(log); }}
                               className="p-1.5 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-lg transition-colors"
                             >
                               <Pencil className="w-3 h-3" />
                             </button>
                             <button 
-                              onClick={() => onDeleteLog(log.id)}
+                              onClick={(e) => { e.stopPropagation(); onDeleteLog(log.id); }}
                               className="p-1.5 bg-danger/10 hover:bg-danger/20 text-danger/40 hover:text-danger rounded-lg transition-colors"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -355,6 +424,22 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
           </AnimatePresence>
         </div>
       </div>
+
+      <ScheduleModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        selectedDate={selectedDate}
+        scheduleText={schedules[format(selectedDate, 'yyyy-MM-dd')] || ''}
+        onSaveSchedule={(text) => onSaveSchedule?.(format(selectedDate, 'yyyy-MM-dd'), text)}
+      />
+
+      <MealDetailsModal 
+        log={selectedMeal} 
+        onClose={() => setSelectedMeal(null)} 
+        onEditLog={onEditLog}
+        onDeleteLog={onDeleteLog}
+        onToggleFavorite={onToggleFavorite}
+      />
     </div>
   );
 }

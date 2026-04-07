@@ -7,6 +7,7 @@ import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { Loader2, Save, ChevronLeft } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
+import { COUNTRIES } from '../lib/countries';
 
 interface BasicInfoScreenProps {
   user: User;

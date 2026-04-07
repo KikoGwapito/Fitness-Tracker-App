@@ -3,6 +3,7 @@ import { ChevronLeft, Star, Plus, Flame, Beef, Droplets, Activity, Trash2, Check
 import { FoodLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 interface FavoritesProps {
   logs: FoodLog[];
@@ -16,18 +17,29 @@ export function FavoritesScreen({ logs, onBack, onLogFavorite, onRemoveFavorites
   const [selectedMeals, setSelectedMeals] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   const pinnedLogs = logs.filter(log => log.isPinned);
   
   const uniquePinnedLogs = Array.from(
-    new Map(pinnedLogs.map(log => [(log.foodName || log.food_name || '').toLowerCase(), log])).values()
+    new Map(pinnedLogs.map(log => [(log.foodName || '').toLowerCase(), log])).values()
   );
 
   const filteredLogs = useMemo(() => {
     if (!searchQuery.trim()) return uniquePinnedLogs;
     const query = searchQuery.toLowerCase();
     return uniquePinnedLogs.filter(log => 
-      (log.foodName || log.food_name || '').toLowerCase().includes(query)
+      (log.foodName || '').toLowerCase().includes(query)
     );
   }, [uniquePinnedLogs, searchQuery]);
 
@@ -53,13 +65,29 @@ export function FavoritesScreen({ logs, onBack, onLogFavorite, onRemoveFavorites
   };
 
   const handleDeleteSelected = () => {
-    onRemoveFavorites(selectedMeals);
-    setSelectionMode(false);
-    setSelectedMeals([]);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remove Favorites',
+      message: `Are you sure you want to remove ${selectedMeals.length} meal(s) from favorites?`,
+      onConfirm: () => {
+        onRemoveFavorites(selectedMeals);
+        setSelectionMode(false);
+        setSelectedMeals([]);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   const handleDeleteSingle = (foodName: string) => {
-    onRemoveFavorites([foodName]);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remove Favorite',
+      message: `Are you sure you want to remove ${foodName} from favorites?`,
+      onConfirm: () => {
+        onRemoveFavorites([foodName]);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   return (
@@ -108,7 +136,7 @@ export function FavoritesScreen({ logs, onBack, onLogFavorite, onRemoveFavorites
       ) : (
         <div className="space-y-4">
           {filteredLogs.map((log) => {
-            const foodName = (log.foodName || log.food_name || '');
+            const foodName = (log.foodName || '');
             const foodNameLower = foodName.toLowerCase();
             const isSelected = selectedMeals.includes(foodNameLower);
 
@@ -212,6 +240,15 @@ export function FavoritesScreen({ logs, onBack, onLogFavorite, onRemoveFavorites
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        variant="danger"
+      />
     </div>
   );
 }

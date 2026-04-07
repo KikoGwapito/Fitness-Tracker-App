@@ -18,7 +18,7 @@ export function MacroRing({
   color, 
   label, 
   size = 100, 
-  strokeWidth = 8,
+  strokeWidth = 12,
   unit = 'g',
   className
 }: MacroRingProps) {

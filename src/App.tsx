@@ -62,6 +62,7 @@ export default function App() {
   }, [profile?.settings]);
   
   const [logs, setLogs] = useState<FoodLog[]>([]);
+  const [schedules, setSchedules] = useState<Record<string, string>>({});
   const [isLogging, setIsLogging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [textInput, setTextInput] = useState('');
@@ -125,9 +126,13 @@ export default function App() {
     // Logs listener
     const logsUnsubscribe = firebaseService.subscribeToMeals(user.uid, setLogs);
 
+    // Schedules listener
+    const schedulesUnsubscribe = firebaseService.subscribeToSchedules(user.uid, setSchedules);
+
     return () => {
       profileUnsubscribe();
       logsUnsubscribe();
+      schedulesUnsubscribe();
     };
   }, [user, isAuthReady]);
 
@@ -218,7 +223,7 @@ export default function App() {
   const handleRemoveFavorites = async (foodNames: string[]) => {
     if (!user) return;
     const lowerNames = foodNames.map(n => n.toLowerCase());
-    const logsToUpdate = logs.filter(l => l.isPinned && lowerNames.includes((l.foodName || l.food_name || '').toLowerCase()));
+    const logsToUpdate = logs.filter(l => l.isPinned && lowerNames.includes((l.foodName || '').toLowerCase()));
     
     for (const log of logsToUpdate) {
       if (log.deletedFromLogs) {
@@ -375,7 +380,7 @@ export default function App() {
     
     // We can just save it directly as a new meal for today
     const mealData = {
-      food_name: log.foodName || log.food_name,
+      foodName: log.foodName,
       calories: log.macros.calories,
       protein: log.macros.protein,
       carbs: log.macros.carbs,
@@ -411,8 +416,8 @@ export default function App() {
       const targetLog = logs.find(l => l.id === logId);
       if (!targetLog) return;
       
-      const foodNameLower = (targetLog.foodName || targetLog.food_name || '').toLowerCase();
-      const matchingLogs = logs.filter(l => (l.foodName || l.food_name || '').toLowerCase() === foodNameLower);
+      const foodNameLower = (targetLog.foodName || '').toLowerCase();
+      const matchingLogs = logs.filter(l => (l.foodName || '').toLowerCase() === foodNameLower);
       
       const updatePromises = matchingLogs.map(l => 
         firebaseService.updateMealInFirebase(user.uid, l.id, { isPinned: !currentPinnedStatus })
@@ -501,6 +506,12 @@ export default function App() {
                 onDeleteLog={handleDeleteLog} 
                 profile={profile} 
                 onToggleFavorite={handleToggleFavorite}
+                schedules={schedules}
+                onSaveSchedule={(date, text) => {
+                  if (user) {
+                    firebaseService.saveSchedule(user.uid, date, text);
+                  }
+                }}
               />
             )}
             {activeTab === 'progress' && <Progress logs={activeLogs} profile={profile} />}

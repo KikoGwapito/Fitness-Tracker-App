@@ -223,6 +223,34 @@ class FirebaseService {
       handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
     }
   }
+
+  async saveSchedule(uid: string, date: string, text: string) {
+    try {
+      const scheduleRef = doc(db, `users/${uid}/schedules`, date);
+      await setDoc(scheduleRef, {
+        userId: uid,
+        date,
+        text,
+        createdAt: Date.now()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `users/${uid}/schedules`);
+    }
+  }
+
+  subscribeToSchedules(uid: string, callback: (schedules: Record<string, string>) => void) {
+    const q = collection(db, `users/${uid}/schedules`);
+    return onSnapshot(q, (snapshot) => {
+      const schedules: Record<string, string> = {};
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        schedules[data.date] = data.text;
+      });
+      callback(schedules);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `users/${uid}/schedules`);
+    });
+  }
 }
 
 export const firebaseService = new FirebaseService();

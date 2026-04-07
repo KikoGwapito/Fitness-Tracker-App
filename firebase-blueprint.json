@@ -24,12 +24,28 @@
         "createdAt": { "type": "number" }
       },
       "required": ["title", "completed", "createdBy", "createdAt"]
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "A user's schedule or note for a specific date",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "date", "text", "createdAt"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User profiles"
+    },
+    "/users/{userId}/schedules/{date}": {
+      "schema": { "$ref": "#/entities/Schedule" },
+      "description": "User schedules"
     },
     "/todos/{todoId}": {
       "schema": { "$ref": "#/entities/Todo" },

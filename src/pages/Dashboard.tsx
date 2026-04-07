@@ -1,10 +1,13 @@
-import React from 'react';
-import { Activity, Flame, Beef, Droplets, MessageSquare, Trash2, Edit2, Star } from 'lucide-react';
+import React, { useState } from 'react';
+import { Activity, Flame, Beef, Droplets, MessageSquare, Trash2, Edit2, Star, CalendarHeart, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { MacroRing } from '../components/MacroRing';
 import { FoodLog, DailyGoals, UserProfile } from '../types';
 import { cn } from '../lib/utils';
 import { User } from 'firebase/auth';
+import { MealDetailsModal } from '../components/MealDetailsModal';
+import { useHolidays } from '../lib/useHolidays';
+import { format } from 'date-fns';
 
 interface DashboardProps {
   user: User;
@@ -16,6 +19,9 @@ interface DashboardProps {
 }
 
 export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggleFavorite }: DashboardProps) {
+  const [selectedMeal, setSelectedMeal] = useState<FoodLog | null>(null);
+  const { holidays } = useHolidays(profile?.country, new Date().getFullYear());
+
   const todayLogs = logs.filter(log => {
     const today = new Date().setHours(0, 0, 0, 0);
     const logDate = new Date(log.timestamp).setHours(0, 0, 0, 0);
@@ -51,6 +57,20 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
   const latestTip = todayLogs.length > 0 ? todayLogs[0].coach_tip : "Log your first meal to get personalized AI insights!";
   const firstName = profile?.name ? profile.name.split(' ')[0] : 'there';
 
+  const todayString = format(new Date(), 'yyyy-MM-dd');
+  const todayHoliday = holidays.find(h => h.date === todayString);
+  const isBirthday = profile?.birthday && format(new Date(profile.birthday), 'MM-dd') === format(new Date(), 'MM-dd');
+
+  // Find upcoming holidays within the next 7 days
+  const upcomingHolidays = holidays.filter(h => {
+    const holidayDate = new Date(h.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffTime = holidayDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 && diffDays <= 7;
+  });
+
   return (
     <div className="flex-1 overflow-y-auto pb-32 px-6 space-y-12 max-w-5xl mx-auto w-full">
       {/* Header */}
@@ -68,6 +88,43 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
         </div>
       </header>
 
+      {/* AI Coach Notification */}
+      {(isBirthday || todayHoliday || upcomingHolidays.length > 0) && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={cn(
+            "p-4 rounded-2xl border flex items-start gap-4 relative overflow-hidden",
+            isBirthday ? "bg-pink-500/10 border-pink-500/20" : "bg-blue-500/10 border-blue-500/20"
+          )}
+        >
+          <div className={cn(
+            "p-2 rounded-xl",
+            isBirthday ? "bg-pink-500/20 text-pink-400" : "bg-blue-500/20 text-blue-400"
+          )}>
+            {isBirthday ? <CalendarHeart className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+          </div>
+          <div className="flex-1">
+            <h3 className={cn(
+              "text-sm font-display uppercase tracking-widest mb-1",
+              isBirthday ? "text-pink-400" : "text-blue-400"
+            )}>
+              {isBirthday ? "Happy Birthday!" : todayHoliday ? "Today's Occasion" : "Upcoming Occasion"}
+            </h3>
+            <p className="text-xs text-white/70 leading-relaxed">
+              {isBirthday 
+                ? `Wishing you a fantastic birthday, ${firstName}! Treat yourself today, but remember your goals.` 
+                : todayHoliday
+                ? `It's ${todayHoliday.name} today! Enjoy the occasion and stay mindful of your nutrition.`
+                : `Heads up! ${upcomingHolidays[0].name} is coming up on ${format(new Date(upcomingHolidays[0].date), 'MMM do')}. Plan your meals accordingly!`}
+            </p>
+          </div>
+          {isBirthday && (
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-pink-500/20 blur-3xl rounded-full" />
+          )}
+        </motion.div>
+      )}
+
       {/* Hero Stats - Full No Scroll Side */}
       <section className="space-y-8">
         <div className="relative flex flex-col items-center">
@@ -77,7 +134,7 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
             color="var(--c-accent)" 
             label="Calories" 
             size={240} 
-            strokeWidth={12}
+            strokeWidth={16}
           />
           <div className="mt-6 text-center">
             <div className="text-[10px] font-display uppercase tracking-widest text-white/40 mb-1">Remaining</div>
@@ -189,7 +246,8 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
                 key={log.id} 
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="vonas-card group"
+                className="vonas-card group cursor-pointer"
+                onClick={() => setSelectedMeal(log)}
               >
                 <div className="flex gap-5 items-center">
                   <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden relative">
@@ -224,7 +282,7 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
                 </div>
                 <div className="flex justify-end gap-4 mt-4 pt-4 border-t border-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
-                    onClick={() => onToggleFavorite(log.id, !!log.isPinned)}
+                    onClick={(e) => { e.stopPropagation(); onToggleFavorite(log.id, !!log.isPinned); }}
                     className={cn(
                       "flex items-center gap-2 text-[10px] font-display uppercase tracking-widest transition-colors",
                       log.isPinned ? "text-accent hover:text-accent/80" : "text-white/40 hover:text-accent"
@@ -233,13 +291,13 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
                     <Star className={cn("w-3 h-3", log.isPinned && "fill-accent")} /> {log.isPinned ? "Favorited" : "Favorite"}
                   </button>
                   <button 
-                    onClick={() => onEditLog(log)}
+                    onClick={(e) => { e.stopPropagation(); onEditLog(log); }}
                     className="flex items-center gap-2 text-[10px] font-display uppercase tracking-widest text-white/40 hover:text-white transition-colors"
                   >
                     <Edit2 className="w-3 h-3" /> Edit
                   </button>
                   <button 
-                    onClick={() => onDeleteLog(log.id)}
+                    onClick={(e) => { e.stopPropagation(); onDeleteLog(log.id); }}
                     className="flex items-center gap-2 text-[10px] font-display uppercase tracking-widest text-white/40 hover:text-danger transition-colors"
                   >
                     <Trash2 className="w-3 h-3" /> Delete
@@ -250,6 +308,11 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
           </div>
         )}
       </section>
+
+      <MealDetailsModal 
+        log={selectedMeal} 
+        onClose={() => setSelectedMeal(null)} 
+      />
     </div>
   );
 }

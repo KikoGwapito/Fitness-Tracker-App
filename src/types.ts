@@ -14,6 +14,9 @@ export interface UserProfile {
   goal?: string;
   daily_goals?: DailyGoals;
   settings?: UserSettings;
+  country?: string;
+  language?: string;
+  birthday?: string;
 }
 
 export interface DailyGoals {
@@ -62,5 +65,13 @@ export interface Todo {
   completed: boolean;
   createdBy: string;
   creatorName?: string;
+  createdAt: number;
+}
+
+export interface Schedule {
+  id: string;
+  userId: string;
+  date: string; // YYYY-MM-DD
+  text: string;
   createdAt: number;
 }
