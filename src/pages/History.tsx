@@ -118,14 +118,27 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
               const dayString = format(selectedDate, 'yyyy-MM-dd');
               const holiday = holidays.find(h => h.date === dayString);
               const isBirthday = profile?.birthday && format(new Date(profile.birthday), 'MM-dd') === format(selectedDate, 'MM-dd');
+              const scheduleText = schedules[dayString];
               
-              if (isBirthday) {
-                return <p className="text-pink-400 text-xs font-display uppercase tracking-widest mt-2 flex items-center gap-1"><CalendarHeart className="w-3 h-3" /> Happy Birthday!</p>;
-              }
-              if (holiday) {
-                return <p className="text-blue-400 text-xs font-display uppercase tracking-widest mt-2">{holiday.name}</p>;
-              }
-              return null;
+              return (
+                <div className="mt-2 space-y-1">
+                  {isBirthday && (
+                    <p className="text-pink-400 text-xs font-display uppercase tracking-widest flex items-center gap-1">
+                      <CalendarHeart className="w-3 h-3" /> Happy Birthday!
+                    </p>
+                  )}
+                  {(!isBirthday && holiday) && (
+                    <p className="text-blue-400 text-xs font-display uppercase tracking-widest">
+                      {holiday.name}
+                    </p>
+                  )}
+                  {(scheduleText && scheduleText.trim() !== '') && (
+                    <p className="text-violet-400 text-xs font-display uppercase tracking-widest flex items-center gap-1">
+                      <CalendarHeart className="w-3 h-3" /> {scheduleText}
+                    </p>
+                  )}
+                </div>
+              );
             })()}
           </div>
         </div>
@@ -227,7 +240,15 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
             const dayString = format(day, 'yyyy-MM-dd');
             const holiday = holidays.find(h => h.date === dayString);
             const isBirthday = profile?.birthday && format(new Date(profile.birthday), 'MM-dd') === format(day, 'MM-dd');
-            const hasSchedule = !!schedules[dayString];
+            const scheduleText = schedules[dayString];
+            const hasSchedule = !!scheduleText && scheduleText.trim() !== '';
+
+            const activeRings = [
+              hasSchedule && { color: "border-violet-500/60", text: "text-violet-400" },
+              isBirthday && { color: "border-pink-500/60", text: "text-pink-400" },
+              (!isBirthday && holiday) && { color: "border-blue-500/60", text: "text-blue-400" },
+              isToday(day) && { color: "border-accent/40", text: "text-accent" }
+            ].filter(Boolean) as { color: string, text: string }[];
 
             return (
               <button
@@ -236,14 +257,23 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
                 className={cn(
                   "aspect-square rounded-full flex items-center justify-center text-xs relative transition-all duration-300 font-display uppercase",
                   !isCurrentMonth && "text-white/10",
-                  isCurrentMonth && !isSelected && "text-white/40 hover:bg-white/5",
-                  isSelected && "bg-accent text-bg scale-110",
-                  isToday(day) && !isSelected && "border border-accent/30 text-accent",
-                  isBirthday && !isSelected && "border border-pink-500/50 text-pink-400",
-                  holiday && !isSelected && !isBirthday && "border border-blue-500/50 text-blue-400"
+                  isCurrentMonth && !isSelected && (activeRings.length > 0 ? activeRings[0].text : "text-white/40 hover:bg-white/5"),
+                  isSelected && "bg-accent text-bg scale-110"
                 )}
               >
-                {format(day, 'd')}
+                <span className="relative z-10">{format(day, 'd')}</span>
+                
+                {!isSelected && activeRings.map((ring, idx) => (
+                  <div 
+                    key={idx} 
+                    className={cn(
+                      "absolute rounded-full border pointer-events-none transition-all duration-300",
+                      ring.color,
+                      idx === 0 ? "inset-0" : idx === 1 ? "-inset-[3px]" : idx === 2 ? "-inset-[6px]" : "-inset-[9px]"
+                    )} 
+                  />
+                ))}
+
                 {status !== 'none' && !isSelected && (
                   <div className={cn(
                     "absolute bottom-1 w-1 h-1 rounded-full",

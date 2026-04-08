@@ -497,6 +497,7 @@ export default function App() {
                 onDeleteLog={handleDeleteLog} 
                 onEditLog={handleEditLog} 
                 onToggleFavorite={handleToggleFavorite}
+                schedules={schedules}
               />
             )}
             {activeTab === 'history' && (

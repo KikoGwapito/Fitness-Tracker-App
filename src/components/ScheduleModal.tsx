@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, CalendarClock } from 'lucide-react';
+import { X, CalendarClock, Eraser, Undo2 } from 'lucide-react';
 import { format, isToday } from 'date-fns';
 
 interface ScheduleModalProps {
@@ -19,12 +19,28 @@ export function ScheduleModal({
   onSaveSchedule
 }: ScheduleModalProps) {
   const [scheduleInput, setScheduleInput] = useState(scheduleText);
+  const [clearedText, setClearedText] = useState<string | null>(null);
 
   useEffect(() => {
     setScheduleInput(scheduleText);
+    setClearedText(null);
   }, [scheduleText, isOpen]);
 
   if (!isOpen) return null;
+
+  const handleClear = () => {
+    if (scheduleInput.trim()) {
+      setClearedText(scheduleInput);
+      setScheduleInput('');
+    }
+  };
+
+  const handleUndo = () => {
+    if (clearedText !== null) {
+      setScheduleInput(clearedText);
+      setClearedText(null);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -60,29 +76,56 @@ export function ScheduleModal({
           </div>
 
           <div className="p-6 space-y-4">
-            <textarea
-              value={scheduleInput}
-              onChange={(e) => setScheduleInput(e.target.value)}
-              placeholder="Add a schedule or note for this day..."
-              className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white placeholder:text-ink/20 focus:outline-none focus:border-accent resize-none transition-all font-light"
-              autoFocus
-            />
-            <div className="flex gap-2 justify-end">
-              <button 
-                onClick={onClose}
-                className="px-4 py-3 rounded-xl text-xs font-display uppercase tracking-wider text-white/40 hover:text-white hover:bg-white/5 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => {
-                  onSaveSchedule(scheduleInput);
-                  onClose();
+            <div className="relative">
+              <textarea
+                value={scheduleInput}
+                onChange={(e) => {
+                  setScheduleInput(e.target.value);
+                  if (clearedText !== null) setClearedText(null); // Hide undo if they start typing
                 }}
-                className="px-6 py-3 rounded-xl text-xs font-display uppercase tracking-wider bg-accent text-bg hover:bg-accent/90 transition-colors"
-              >
-                Save
-              </button>
+                placeholder="Add a schedule or note for this day..."
+                className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-accent resize-none transition-all font-light"
+                autoFocus
+              />
+              {scheduleInput.trim() && (
+                <button
+                  onClick={handleClear}
+                  className="absolute top-3 right-3 p-1.5 bg-bg/50 hover:bg-white/10 text-white/40 hover:text-white rounded-lg transition-colors backdrop-blur-sm"
+                  title="Clear text"
+                >
+                  <Eraser className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div>
+                {clearedText !== null && (
+                  <button
+                    onClick={handleUndo}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-display uppercase tracking-wider text-accent hover:bg-accent/10 transition-colors"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" /> Undo Clear
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={onClose}
+                  className="px-4 py-3 rounded-xl text-xs font-display uppercase tracking-wider text-white/40 hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    onSaveSchedule(scheduleInput);
+                    onClose();
+                  }}
+                  className="px-6 py-3 rounded-xl text-xs font-display uppercase tracking-wider bg-accent text-bg hover:bg-accent/90 transition-colors"
+                >
+                  Save
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>

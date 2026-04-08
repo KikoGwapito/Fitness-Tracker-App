@@ -16,9 +16,10 @@ interface DashboardProps {
   onDeleteLog: (logId: string) => void;
   onEditLog: (log: FoodLog) => void;
   onToggleFavorite: (logId: string, currentPinnedStatus: boolean) => void;
+  schedules?: Record<string, string>;
 }
 
-export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggleFavorite }: DashboardProps) {
+export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggleFavorite, schedules = {} }: DashboardProps) {
   const [selectedMeal, setSelectedMeal] = useState<FoodLog | null>(null);
   const { holidays } = useHolidays(profile?.country, new Date().getFullYear());
 
@@ -71,6 +72,26 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
     return diffDays > 0 && diffDays <= 7;
   });
 
+  // Find upcoming schedules (within the next 2 days)
+  const upcomingSchedules = Object.entries(schedules)
+    .filter(([dateStr, text]) => {
+      if (!text || text.trim() === '') return false;
+      
+      const scheduleDate = new Date(dateStr);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const twoDaysFromNow = new Date(today);
+      twoDaysFromNow.setDate(today.getDate() + 2);
+      twoDaysFromNow.setHours(23, 59, 59, 999);
+      
+      return scheduleDate.getTime() >= today.getTime() && scheduleDate.getTime() <= twoDaysFromNow.getTime();
+    })
+    .sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime())
+    .slice(0, 3); // Show up to 3 upcoming schedules
+
+  const hasOccasion = isBirthday || todayHoliday || upcomingHolidays.length > 0;
+
   return (
     <div className="flex-1 overflow-y-auto pb-32 px-6 space-y-12 max-w-5xl mx-auto w-full">
       {/* Header */}
@@ -88,41 +109,84 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
         </div>
       </header>
 
-      {/* AI Coach Notification */}
-      {(isBirthday || todayHoliday || upcomingHolidays.length > 0) && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={cn(
-            "p-4 rounded-2xl border flex items-start gap-4 relative overflow-hidden",
-            isBirthday ? "bg-pink-500/10 border-pink-500/20" : "bg-blue-500/10 border-blue-500/20"
+      {/* Notifications Grid */}
+      {(upcomingSchedules.length > 0 || hasOccasion) && (
+        <div className="grid grid-cols-2 gap-4 md:gap-6 items-start">
+          {/* Upcoming Schedules Notification */}
+          {upcomingSchedules.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-violet-500/10 border border-violet-500/20 rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden"
+            >
+              <div className="absolute -right-4 -top-4 w-24 h-24 bg-violet-500/20 blur-2xl rounded-full pointer-events-none" />
+              <div className="flex items-center gap-2 text-violet-400">
+                <CalendarHeart className="w-5 h-5" />
+                <h3 className="text-xs font-display uppercase tracking-widest">Upcoming Schedules</h3>
+              </div>
+              <div className="space-y-2">
+                {upcomingSchedules.map(([dateStr, text]) => {
+                  const scheduleDate = new Date(dateStr);
+                  // Ensure we use local time for display
+                  const localDate = new Date(scheduleDate.getTime() + scheduleDate.getTimezoneOffset() * 60000);
+                  const isTodaySchedule = format(localDate, 'yyyy-MM-dd') === todayString;
+                  
+                  return (
+                    <div key={dateStr} className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-start bg-black/20 rounded-xl p-3">
+                      <div className="flex items-center gap-2 sm:flex-col sm:gap-0 bg-violet-500/20 text-violet-300 rounded-lg px-2 py-1.5 sm:py-1 text-center shrink-0">
+                        <div className="text-[8px] font-display uppercase tracking-widest leading-none sm:mb-1">{format(localDate, 'MMM')}</div>
+                        <div className="text-sm font-display leading-none">{format(localDate, 'd')}</div>
+                      </div>
+                      <div className="flex-1 min-w-0 w-full">
+                        <p className="text-xs text-white/80 whitespace-pre-wrap break-words">{text}</p>
+                        {isTodaySchedule && (
+                          <span className="inline-block mt-1 text-[8px] font-display uppercase tracking-widest text-violet-400 bg-violet-500/20 px-1.5 py-0.5 rounded">Today</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
           )}
-        >
-          <div className={cn(
-            "p-2 rounded-xl",
-            isBirthday ? "bg-pink-500/20 text-pink-400" : "bg-blue-500/20 text-blue-400"
-          )}>
-            {isBirthday ? <CalendarHeart className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
-          </div>
-          <div className="flex-1">
-            <h3 className={cn(
-              "text-sm font-display uppercase tracking-widest mb-1",
-              isBirthday ? "text-pink-400" : "text-blue-400"
-            )}>
-              {isBirthday ? "Happy Birthday!" : todayHoliday ? "Today's Occasion" : "Upcoming Occasion"}
-            </h3>
-            <p className="text-xs text-white/70 leading-relaxed">
-              {isBirthday 
-                ? `Wishing you a fantastic birthday, ${firstName}! Treat yourself today, but remember your goals.` 
-                : todayHoliday
-                ? `It's ${todayHoliday.name} today! Enjoy the occasion and stay mindful of your nutrition.`
-                : `Heads up! ${upcomingHolidays[0].name} is coming up on ${format(new Date(upcomingHolidays[0].date), 'MMM do')}. Plan your meals accordingly!`}
-            </p>
-          </div>
-          {isBirthday && (
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-pink-500/20 blur-3xl rounded-full" />
+
+          {/* AI Coach Notification */}
+          {hasOccasion && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={cn(
+                "p-4 rounded-2xl border flex flex-col sm:flex-row items-start gap-4 relative overflow-hidden",
+                isBirthday ? "bg-pink-500/10 border-pink-500/20" : "bg-blue-500/10 border-blue-500/20"
+              )}
+            >
+              <div className={cn(
+                "p-2 rounded-xl shrink-0",
+                isBirthday ? "bg-pink-500/20 text-pink-400" : "bg-blue-500/20 text-blue-400"
+              )}>
+                {isBirthday ? <CalendarHeart className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className={cn(
+                  "text-xs sm:text-sm font-display uppercase tracking-widest mb-1 truncate",
+                  isBirthday ? "text-pink-400" : "text-blue-400"
+                )}>
+                  {isBirthday ? "Happy Birthday!" : todayHoliday ? "Today's Occasion" : "Upcoming Occasion"}
+                </h3>
+                <p className="text-[10px] sm:text-xs text-white/70 leading-relaxed line-clamp-4">
+                  {isBirthday 
+                    ? `Wishing you a fantastic birthday, ${firstName}! Treat yourself today, but remember your goals.` 
+                    : todayHoliday
+                    ? `It's ${todayHoliday.name} today! Enjoy the occasion and stay mindful of your nutrition.`
+                    : `Heads up! ${upcomingHolidays[0].name} is coming up on ${format(new Date(upcomingHolidays[0].date), 'MMM do')}. Plan your meals accordingly!`}
+                </p>
+              </div>
+              {isBirthday && (
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-pink-500/20 blur-3xl rounded-full pointer-events-none" />
+              )}
+            </motion.div>
           )}
-        </motion.div>
+        </div>
       )}
 
       {/* Hero Stats - Full No Scroll Side */}
