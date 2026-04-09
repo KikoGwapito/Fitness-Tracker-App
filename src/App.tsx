@@ -18,6 +18,7 @@ import { MenuScreen } from './pages/Menu';
 import { AppInfo } from './pages/AppInfo';
 import { FavoritesScreen } from './pages/Favorites';
 import { ConfirmModal } from './components/ConfirmModal';
+import { useNotifications } from './lib/useNotifications';
 
 const DEFAULT_GOALS: DailyGoals = {
   calories: 2200,
@@ -34,6 +35,11 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [subPage, setSubPage] = useState<'none' | 'profile' | 'basic-info' | 'app-info' | 'favorites'>('none');
+  const [logs, setLogs] = useState<FoodLog[]>([]);
+  const [schedules, setSchedules] = useState<Record<string, string>>({});
+
+  // Initialize notifications
+  useNotifications(logs, profile, schedules);
 
   // Apply Settings
   useEffect(() => {
@@ -61,14 +67,13 @@ export default function App() {
     }
   }, [profile?.settings]);
   
-  const [logs, setLogs] = useState<FoodLog[]>([]);
-  const [schedules, setSchedules] = useState<Record<string, string>>({});
   const [isLogging, setIsLogging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [textInput, setTextInput] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageMimeType, setImageMimeType] = useState<string | null>(null);
   const [editingLog, setEditingLog] = useState<FoodLog | null>(null);
+  const [shouldTriggerCamera, setShouldTriggerCamera] = useState(false);
   const [pendingAnalysis, setPendingAnalysis] = useState<{
     clarification_required: string;
     reason: string;
@@ -77,6 +82,28 @@ export default function App() {
     isConfirmed?: boolean;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle URL shortcut for camera
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'camera') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setShouldTriggerCamera(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (shouldTriggerCamera && isAuthReady && user) {
+      setIsLogging(true);
+      setShouldTriggerCamera(false);
+      // Wait for modal to render then click the file input
+      setTimeout(() => {
+        if (fileInputRef.current) {
+          fileInputRef.current.click();
+        }
+      }, 300);
+    }
+  }, [shouldTriggerCamera, isAuthReady, user]);
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;

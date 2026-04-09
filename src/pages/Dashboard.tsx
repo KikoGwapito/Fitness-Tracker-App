@@ -111,7 +111,10 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
 
       {/* Notifications Grid */}
       {(upcomingSchedules.length > 0 || hasOccasion) && (
-        <div className="grid grid-cols-2 gap-4 md:gap-6 items-start">
+        <div className={cn(
+          "grid gap-4 md:gap-6 items-start",
+          (upcomingSchedules.length > 0 && hasOccasion) ? "grid-cols-2" : "grid-cols-1"
+        )}>
           {/* Upcoming Schedules Notification */}
           {upcomingSchedules.length > 0 && (
             <motion.div 

@@ -4,7 +4,7 @@ import { User } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
-import { Loader2, Save, ChevronLeft, Camera, Trash2 } from 'lucide-react';
+import { Loader2, Save, ChevronLeft, Camera, Trash2, Bell, BellOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { COUNTRIES } from '../lib/countries';
@@ -18,7 +18,23 @@ interface UserProfileScreenProps {
 export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      alert('This browser does not support desktop notifications');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+  };
 
   const [formData, setFormData] = useState({
     name: profile?.name || '',
@@ -266,6 +282,36 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
               )}
             </div>
           </div>
+
+          {!isEditing && (
+            <div className="pt-8 border-t border-white/10 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-display uppercase tracking-widest text-white">Push Notifications</h3>
+                  <p className="text-xs text-white/40 mt-1">Get alerts for goals, macros, and occasions.</p>
+                </div>
+                {notificationPermission === 'granted' ? (
+                  <div className="flex items-center gap-2 text-accent bg-accent/10 px-3 py-1.5 rounded-lg border border-accent/20">
+                    <Bell className="w-4 h-4" />
+                    <span className="text-xs font-display uppercase tracking-widest">Enabled</span>
+                  </div>
+                ) : notificationPermission === 'denied' ? (
+                  <div className="flex items-center gap-2 text-danger bg-danger/10 px-3 py-1.5 rounded-lg border border-danger/20">
+                    <BellOff className="w-4 h-4" />
+                    <span className="text-xs font-display uppercase tracking-widest">Blocked</span>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={requestNotificationPermission}
+                    className="flex items-center gap-2 text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <Bell className="w-4 h-4" />
+                    <span className="text-xs font-display uppercase tracking-widest">Enable</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {isEditing && (
