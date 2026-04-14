@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Plus, Activity, Flame, Droplets, Beef, X, Loader2, MessageSquare, Image as ImageIcon, LogOut, LogIn, ChevronRight, Sparkles, Apple, Star } from 'lucide-react';
+import { Camera as CameraIcon, Plus, Activity, Flame, Droplets, Beef, X, Loader2, MessageSquare, Image as ImageIcon, LogOut, LogIn, ChevronRight, Sparkles, Apple, Star } from 'lucide-react';
 import { analyzeMeal } from './lib/gemini';
 import { FoodLog, DailyGoals, UserProfile, UserSettings } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -18,7 +18,10 @@ import { MenuScreen } from './pages/Menu';
 import { AppInfo } from './pages/AppInfo';
 import { FavoritesScreen } from './pages/Favorites';
 import { ConfirmModal } from './components/ConfirmModal';
+import { ActivityModal } from './components/ActivityModal';
 import { useNotifications } from './lib/useNotifications';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Capacitor } from '@capacitor/core';
 
 const DEFAULT_GOALS: DailyGoals = {
   calories: 2200,
@@ -36,6 +39,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [subPage, setSubPage] = useState<'none' | 'profile' | 'basic-info' | 'app-info' | 'favorites'>('none');
   const [logs, setLogs] = useState<FoodLog[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<Record<string, string>>({});
 
   // Initialize notifications
@@ -44,14 +48,18 @@ export default function App() {
   // Apply Settings
   useEffect(() => {
     if (profile?.settings) {
-      const { accentColor, fontSize, theme } = profile.settings;
+      const { accentColor, fontSize, theme, fontFamily } = profile.settings;
       
       // Accent Color
-      document.documentElement.style.setProperty('--c-accent', accentColor);
+      if (accentColor) {
+        document.documentElement.style.setProperty('--c-accent', accentColor);
+      }
       
       // Font Size
-      document.documentElement.classList.remove('text-small', 'text-medium', 'text-large');
-      document.documentElement.classList.add(`text-${fontSize}`);
+      if (fontSize) {
+        document.documentElement.classList.remove('text-small', 'text-medium', 'text-large');
+        document.documentElement.classList.add(`text-${fontSize}`);
+      }
       
       // Theme
       if (theme === 'light') {
@@ -59,11 +67,19 @@ export default function App() {
       } else {
         document.documentElement.classList.remove('light');
       }
+
+      // Font Family
+      if (fontFamily) {
+        document.documentElement.style.setProperty('--font-display', fontFamily);
+      } else {
+        document.documentElement.style.setProperty('--font-display', 'Anton, sans-serif');
+      }
     } else {
       // Defaults
-      document.documentElement.style.setProperty('--c-accent', '#F27D26');
+      document.documentElement.style.setProperty('--c-accent', '#FFA0A0');
       document.documentElement.classList.remove('text-small', 'text-large', 'light');
       document.documentElement.classList.add('text-medium');
+      document.documentElement.style.setProperty('--font-display', 'Anton, sans-serif');
     }
   }, [profile?.settings]);
   
@@ -73,7 +89,9 @@ export default function App() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageMimeType, setImageMimeType] = useState<string | null>(null);
   const [editingLog, setEditingLog] = useState<FoodLog | null>(null);
+  const [editingActivity, setEditingActivity] = useState<any | null>(null);
   const [shouldTriggerCamera, setShouldTriggerCamera] = useState(false);
+  const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [pendingAnalysis, setPendingAnalysis] = useState<{
     clarification_required: string;
     reason: string;
@@ -96,11 +114,9 @@ export default function App() {
     if (shouldTriggerCamera && isAuthReady && user) {
       setIsLogging(true);
       setShouldTriggerCamera(false);
-      // Wait for modal to render then click the file input
+      // Wait for modal to render then trigger image selection
       setTimeout(() => {
-        if (fileInputRef.current) {
-          fileInputRef.current.click();
-        }
+        handleImageSelect();
       }, 300);
     }
   }, [shouldTriggerCamera, isAuthReady, user]);
@@ -156,10 +172,14 @@ export default function App() {
     // Schedules listener
     const schedulesUnsubscribe = firebaseService.subscribeToSchedules(user.uid, setSchedules);
 
+    // Activities listener
+    const activitiesUnsubscribe = firebaseService.subscribeToActivities(user.uid, setActivities);
+
     return () => {
       profileUnsubscribe();
       logsUnsubscribe();
       schedulesUnsubscribe();
+      activitiesUnsubscribe();
     };
   }, [user, isAuthReady]);
 
@@ -206,22 +226,46 @@ export default function App() {
     { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, sugar_g: 0, sodium_mg: 0 }
   );
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setImageMimeType('image/jpeg'); // We will force it to jpeg during compression
-    const reader = new FileReader();
-    reader.onloadend = async () => {
+  const handleImageSelect = async (e?: React.ChangeEvent<HTMLInputElement>) => {
+    if (Capacitor.isNativePlatform()) {
       try {
-        const compressedDataUrl = await compressImage(reader.result as string, 600, 0.6);
-        setSelectedImage(compressedDataUrl);
-      } catch (err) {
-        console.error("Failed to compress image immediately:", err);
-        setSelectedImage(reader.result as string); // Fallback to original
+        const image = await Camera.getPhoto({
+          quality: 60,
+          allowEditing: false,
+          resultType: CameraResultType.DataUrl,
+          source: CameraSource.Prompt
+        });
+        
+        if (image.dataUrl) {
+          setImageMimeType('image/jpeg');
+          setSelectedImage(image.dataUrl);
+        }
+      } catch (error) {
+        console.error("Camera error:", error);
       }
-    };
-    reader.readAsDataURL(file);
+    } else {
+      if (!e) {
+        // If called without event, trigger the hidden file input
+        fileInputRef.current?.click();
+        return;
+      }
+      
+      const file = e?.target?.files?.[0];
+      if (!file) return;
+
+      setImageMimeType('image/jpeg'); // We will force it to jpeg during compression
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const compressedDataUrl = await compressImage(reader.result as string, 600, 0.6);
+          setSelectedImage(compressedDataUrl);
+        } catch (err) {
+          console.error("Failed to compress image immediately:", err);
+          setSelectedImage(reader.result as string); // Fallback to original
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleDeleteLog = async (logId: string) => {
@@ -245,6 +289,29 @@ export default function App() {
         }
       }
     });
+  };
+
+  const handleDeleteActivity = async (activityId: string) => {
+    if (!user) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Activity',
+      message: 'Are you sure you want to delete this activity? This action cannot be undone.',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await firebaseService.deleteActivityFromFirebase(user.uid, activityId);
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        } catch (error) {
+          console.error('Delete failed:', error);
+        }
+      }
+    });
+  };
+
+  const handleEditActivity = (activity: any) => {
+    setEditingActivity(activity);
+    setIsActivityModalOpen(true);
   };
 
   const handleRemoveFavorites = async (foodNames: string[]) => {
@@ -509,10 +576,18 @@ export default function App() {
         {/* Content Area */}
         <div className="flex-1 flex flex-col relative overflow-hidden">
           {/* App Header */}
-          <header className="px-6 py-4 border-b border-white/5 flex items-center justify-center md:justify-start">
+          <header className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
             <h1 className="text-xl font-display uppercase tracking-[0.2em] text-white">
               G-<span className="text-accent font-light">Refine</span>
             </h1>
+            <motion.button 
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setIsActivityModalOpen(true)}
+              className="px-3 py-2 rounded-full bg-white/5 flex items-center gap-2 border border-white/10 transition-colors"
+            >
+              <Plus className="w-4 h-4 text-accent" />
+              <span className="text-[10px] font-display uppercase tracking-widest text-white">Activity</span>
+            </motion.button>
           </header>
 
           <main ref={mainContentRef} className="flex-1 overflow-y-auto pb-24 md:pb-0 relative">
@@ -521,6 +596,7 @@ export default function App() {
                 user={user} 
                 profile={profile} 
                 logs={activeLogs} 
+                activities={activities}
                 onDeleteLog={handleDeleteLog} 
                 onEditLog={handleEditLog} 
                 onToggleFavorite={handleToggleFavorite}
@@ -530,8 +606,11 @@ export default function App() {
             {activeTab === 'history' && (
               <History 
                 logs={activeLogs} 
+                activities={activities}
                 onEditLog={handleEditLog} 
                 onDeleteLog={handleDeleteLog} 
+                onEditActivity={handleEditActivity}
+                onDeleteActivity={handleDeleteActivity}
                 profile={profile} 
                 onToggleFavorite={handleToggleFavorite}
                 schedules={schedules}
@@ -542,7 +621,7 @@ export default function App() {
                 }}
               />
             )}
-            {activeTab === 'progress' && <Progress logs={activeLogs} profile={profile} />}
+            {activeTab === 'progress' && <Progress logs={activeLogs} profile={profile} activities={activities} />}
             
             {activeTab === 'menu' && subPage === 'none' && (
               <MenuScreen 
@@ -577,6 +656,9 @@ export default function App() {
                 onBack={() => setSubPage('none')} 
                 onLogFavorite={handleLogFavorite}
                 onRemoveFavorites={handleRemoveFavorites}
+                onEditLog={handleEditLog}
+                onDeleteLog={handleDeleteLog}
+                onToggleFavorite={handleToggleFavorite}
               />
             )}
           </main>
@@ -762,7 +844,7 @@ export default function App() {
                   <>
                     {/* Image Upload Area */}
                     <div 
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => handleImageSelect()}
                       className={cn(
                         "relative w-full aspect-square rounded-3xl border-2 border-dashed flex flex-col items-center justify-center overflow-hidden cursor-pointer transition-all duration-500",
                         selectedImage ? "border-accent/50 bg-white/5" : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
@@ -780,7 +862,7 @@ export default function App() {
                       ) : (
                         <>
                           <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10">
-                            <Camera className="w-8 h-8 text-ink/40" />
+                            <CameraIcon className="w-8 h-8 text-ink/40" />
                           </div>
                           <p className="text-xs font-display uppercase tracking-widest text-white">Tap to snap</p>
                           <p className="text-[10px] text-ink/40 mt-2 uppercase tracking-tighter">Or upload from gallery</p>
@@ -792,7 +874,7 @@ export default function App() {
                         capture="environment"
                         className="hidden" 
                         ref={fileInputRef}
-                        onChange={handleImageSelect}
+                        onChange={(e) => handleImageSelect(e)}
                       />
                     </div>
 
@@ -858,6 +940,27 @@ export default function App() {
           variant={confirmModal.variant}
           onConfirm={confirmModal.onConfirm}
           onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        />
+
+        {/* Activity Modal */}
+        <ActivityModal 
+          isOpen={isActivityModalOpen}
+          onClose={() => {
+            setIsActivityModalOpen(false);
+            setEditingActivity(null);
+          }}
+          profile={profile}
+          editingActivity={editingActivity}
+          onSave={async (activity) => {
+            if (user) {
+              if (editingActivity) {
+                await firebaseService.updateActivityToFirebase(user.uid, editingActivity.id, activity);
+              } else {
+                await firebaseService.saveActivityToFirebase(user.uid, activity);
+              }
+              setEditingActivity(null);
+            }
+          }}
         />
       </div>
     </div>

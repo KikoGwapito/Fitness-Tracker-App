@@ -4,7 +4,7 @@ import { User } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
-import { Loader2, Save, ChevronLeft, Camera, Trash2, Bell, BellOff } from 'lucide-react';
+import { Loader2, Save, ChevronLeft, Camera, Trash2, Bell, BellOff, Activity } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { COUNTRIES } from '../lib/countries';
@@ -101,18 +101,38 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
     setFormData(prev => ({ ...prev, profile_picture: '' }));
   };
 
+  const calculateAge = (birthday: string) => {
+    if (!birthday) return null;
+    const birthDate = new Date(birthday);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
+      const age = calculateAge(formData.birthday);
+      
+      const updateData: any = {
         name: formData.name,
         username: formData.username,
         profile_picture: formData.profile_picture,
         country: formData.country,
         language: formData.language,
         birthday: formData.birthday,
-      });
+      };
+
+      if (age !== null) {
+        updateData.age = age;
+      }
+
+      await updateDoc(userRef, updateData);
       setIsEditing(false);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
@@ -221,17 +241,25 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Birthday</label>
+            <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Birthday & Age</label>
             {isEditing ? (
-              <input 
-                type="date" 
-                value={formData.birthday}
-                onChange={e => setFormData({ ...formData, birthday: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
-              />
+              <div className="flex gap-4 items-center">
+                <input 
+                  type="date" 
+                  value={formData.birthday}
+                  onChange={e => setFormData({ ...formData, birthday: e.target.value })}
+                  className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                />
+                {formData.birthday && (
+                  <div className="text-xl font-display text-white/60 w-20 text-center">
+                    {calculateAge(formData.birthday)} yrs
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="text-xl font-display text-white">
-                {formData.birthday || '--'}
+                {formData.birthday || '--'} 
+                {formData.birthday && <span className="text-white/40 ml-2">({calculateAge(formData.birthday)} yrs)</span>}
               </div>
             )}
           </div>
@@ -284,7 +312,7 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
           </div>
 
           {!isEditing && (
-            <div className="pt-8 border-t border-white/10 space-y-4">
+            <div className="pt-8 border-t border-white/10 space-y-8">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-display uppercase tracking-widest text-white">Push Notifications</h3>
@@ -309,6 +337,51 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
                     <span className="text-xs font-display uppercase tracking-widest">Enable</span>
                   </button>
                 )}
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-display uppercase tracking-widest text-white">Connected Apps</h3>
+                  <p className="text-xs text-white/40 mt-1">Sync your activities from other platforms.</p>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[#fc4c02]/20 flex items-center justify-center">
+                        <Activity className="w-5 h-5 text-[#fc4c02]" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-display uppercase">Strava</h4>
+                        <p className="text-[10px] font-display uppercase tracking-widest text-white/40">Not connected</p>
+                      </div>
+                    </div>
+                    <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full text-[10px] font-display uppercase tracking-widest transition-colors">
+                      Connect
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl opacity-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                        <Activity className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-display uppercase">Apple Health</h4>
+                        <p className="text-[10px] font-display uppercase tracking-widest text-white/40">Coming soon</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl opacity-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                        <Activity className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-display uppercase">Samsung Health</h4>
+                        <p className="text-[10px] font-display uppercase tracking-widest text-white/40">Coming soon</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

@@ -13,13 +13,14 @@ interface DashboardProps {
   user: User;
   profile: UserProfile | null;
   logs: FoodLog[];
+  activities?: any[];
   onDeleteLog: (logId: string) => void;
   onEditLog: (log: FoodLog) => void;
   onToggleFavorite: (logId: string, currentPinnedStatus: boolean) => void;
   schedules?: Record<string, string>;
 }
 
-export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggleFavorite, schedules = {} }: DashboardProps) {
+export function Dashboard({ user, profile, logs, activities = [], onDeleteLog, onEditLog, onToggleFavorite, schedules = {} }: DashboardProps) {
   const [selectedMeal, setSelectedMeal] = useState<FoodLog | null>(null);
   const { holidays } = useHolidays(profile?.country, new Date().getFullYear());
 
@@ -28,6 +29,14 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
     const logDate = new Date(log.timestamp).setHours(0, 0, 0, 0);
     return today === logDate;
   });
+
+  const todayActivities = activities.filter(act => {
+    const today = new Date().setHours(0, 0, 0, 0);
+    const actDate = new Date(act.timestamp).setHours(0, 0, 0, 0);
+    return today === actDate;
+  });
+
+  const burnedCalories = todayActivities.reduce((acc, act) => acc + (act.calories_burned || 0), 0);
 
   const currentTotals = todayLogs.reduce(
     (acc, log) => ({
@@ -103,9 +112,6 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
           <h1 className="text-5xl font-display leading-none uppercase">
             Hello, <br /> <span className="text-stroke">{firstName}</span>
           </h1>
-        </div>
-        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 backdrop-blur-xl">
-          <Activity className="w-6 h-6 text-accent" />
         </div>
       </header>
 
@@ -196,10 +202,10 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
       <section className="space-y-8">
         <div className="relative flex flex-col items-center">
           <MacroRing 
-            value={currentTotals.calories} 
+            value={Math.max(0, currentTotals.calories - burnedCalories)} 
             max={goals.calories} 
             color="var(--c-accent)" 
-            label="Calories" 
+            label="Net Calories" 
             size={240} 
             strokeWidth={16}
           />
@@ -207,10 +213,15 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
             <div className="text-[10px] font-display uppercase tracking-widest text-white/40 mb-1">Remaining</div>
             <div className={cn(
               "text-4xl font-display uppercase",
-              currentTotals.calories > goals.calories ? "text-danger" : "text-white"
+              (currentTotals.calories - burnedCalories) > goals.calories ? "text-danger" : "text-white"
             )}>
-              {Math.max(0, goals.calories - currentTotals.calories)} <span className="text-sm opacity-40">kcal</span>
+              {Math.max(0, goals.calories - (currentTotals.calories - burnedCalories))} <span className="text-sm opacity-40">kcal</span>
             </div>
+            {burnedCalories > 0 && (
+              <div className="text-xs text-accent mt-2 font-display uppercase tracking-widest">
+                Burned: {burnedCalories} kcal
+              </div>
+            )}
           </div>
         </div>
         
@@ -276,6 +287,36 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
         </div>
 
       </section>
+
+      {/* Activities Section */}
+      {todayActivities.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-display uppercase tracking-[0.2em] text-white/60">Today's Activities</h2>
+          </div>
+          <div className="space-y-3">
+            {todayActivities.map(activity => (
+              <div key={activity.id} className="vonas-card flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
+                    <Activity className="w-5 h-5 text-accent" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-display uppercase">{activity.activityName}</h4>
+                    <p className="text-[10px] font-display uppercase tracking-widest text-white/40">
+                      {activity.duration_minutes} min • {activity.source}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-display text-accent">-{activity.calories_burned}</div>
+                  <div className="text-[8px] font-display uppercase tracking-widest text-white/40">kcal</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* AI Coach Insight */}
       <section>
@@ -347,28 +388,31 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
                     </div>
                   </div>
                 </div>
-                <div className="flex justify-end gap-4 mt-4 pt-4 border-t border-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
+                <div className="flex justify-end gap-4 mt-4 pt-4 border-t border-white/5">
+                  <motion.button 
+                    whileTap={{ scale: 0.9 }}
                     onClick={(e) => { e.stopPropagation(); onToggleFavorite(log.id, !!log.isPinned); }}
                     className={cn(
                       "flex items-center gap-2 text-[10px] font-display uppercase tracking-widest transition-colors",
-                      log.isPinned ? "text-accent hover:text-accent/80" : "text-white/40 hover:text-accent"
+                      log.isPinned ? "text-accent" : "text-white/40"
                     )}
                   >
                     <Star className={cn("w-3 h-3", log.isPinned && "fill-accent")} /> {log.isPinned ? "Favorited" : "Favorite"}
-                  </button>
-                  <button 
+                  </motion.button>
+                  <motion.button 
+                    whileTap={{ scale: 0.9 }}
                     onClick={(e) => { e.stopPropagation(); onEditLog(log); }}
-                    className="flex items-center gap-2 text-[10px] font-display uppercase tracking-widest text-white/40 hover:text-white transition-colors"
+                    className="flex items-center gap-2 text-[10px] font-display uppercase tracking-widest text-white/40 transition-colors"
                   >
                     <Edit2 className="w-3 h-3" /> Edit
-                  </button>
-                  <button 
+                  </motion.button>
+                  <motion.button 
+                    whileTap={{ scale: 0.9 }}
                     onClick={(e) => { e.stopPropagation(); onDeleteLog(log.id); }}
-                    className="flex items-center gap-2 text-[10px] font-display uppercase tracking-widest text-white/40 hover:text-danger transition-colors"
+                    className="flex items-center gap-2 text-[10px] font-display uppercase tracking-widest text-white/40 transition-colors"
                   >
                     <Trash2 className="w-3 h-3" /> Delete
-                  </button>
+                  </motion.button>
                 </div>
               </motion.div>
             ))}
@@ -379,6 +423,9 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
       <MealDetailsModal 
         log={selectedMeal} 
         onClose={() => setSelectedMeal(null)} 
+        onEditLog={onEditLog}
+        onDeleteLog={onDeleteLog}
+        onToggleFavorite={onToggleFavorite}
       />
     </div>
   );

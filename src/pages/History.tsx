@@ -9,22 +9,29 @@ import { MealDetailsModal } from '../components/MealDetailsModal';
 import { ScheduleModal } from '../components/ScheduleModal';
 import { useHolidays } from '../lib/useHolidays';
 
+import { ActivityDetailsModal } from '../components/ActivityDetailsModal';
+
 interface HistoryProps {
   logs: FoodLog[];
+  activities?: any[];
   onEditLog: (log: FoodLog) => void;
   onDeleteLog: (logId: string) => void;
+  onEditActivity?: (activity: any) => void;
+  onDeleteActivity?: (activityId: string) => void;
   profile: UserProfile | null;
   onToggleFavorite: (logId: string, currentPinnedStatus: boolean) => void;
   schedules?: Record<string, string>;
   onSaveSchedule?: (date: string, text: string) => void;
 }
 
-export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorite, schedules = {}, onSaveSchedule }: HistoryProps) {
+export function History({ logs, activities = [], onEditLog, onDeleteLog, onEditActivity, onDeleteActivity, profile, onToggleFavorite, schedules = {}, onSaveSchedule }: HistoryProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isMealsOpen, setIsMealsOpen] = useState(false);
+  const [isActivitiesOpen, setIsActivitiesOpen] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<FoodLog | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<any | null>(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   useEffect(() => {
@@ -52,6 +59,7 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
   const prevMonth = () => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)));
 
   const selectedLogs = logs.filter(log => isSameDay(new Date(log.timestamp), selectedDate));
+  const selectedActivities = activities.filter(act => isSameDay(new Date(act.timestamp), selectedDate));
 
   const dailyTotals = selectedLogs.reduce(
     (acc, log) => ({
@@ -396,53 +404,107 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
                       <div className="flex gap-4 items-center">
                         <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden relative">
                           {log.image_url ? (
-                            <img src={log.image_url} alt={log.foodName} className="w-full h-full object-cover opacity-60" />
+                            <img src={log.image_url} alt="Meal" className="w-full h-full object-cover" />
                           ) : (
                             <Beef className="w-5 h-5 text-white/20" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-display uppercase break-words group-hover:text-accent transition-colors">{log.foodName}</h4>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[8px] font-display uppercase tracking-wider text-white/40">
-                            <span className="flex items-center gap-1"><Flame className="w-2.5 h-2.5 text-accent" /> {log.macros.calories}</span>
-                            <span className="flex items-center gap-1"><Beef className="w-2.5 h-2.5 text-blue-400" /> {log.macros.protein}g</span>
-                            <span className="flex items-center gap-1"><Droplets className="w-2.5 h-2.5 text-amber-400" /> {log.macros.carbs}g</span>
-                            <span className="flex items-center gap-1"><Activity className="w-2.5 h-2.5 text-violet-400" /> {log.macros.fat}g</span>
-                            <span className="flex items-center gap-1"><Activity className="w-2.5 h-2.5 text-pink-400" /> {log.sugar_g || 0}g</span>
-                            <span className="flex items-center gap-1"><Activity className="w-2.5 h-2.5 text-emerald-400" /> {log.sodium_mg || 0}mg</span>
+                          <h3 className="text-sm font-display uppercase tracking-wider truncate mb-1">{log.food_name}</h3>
+                          <div className="flex items-center gap-3 text-[10px] font-display uppercase tracking-widest text-white/40">
+                            <span className="text-accent">{log.macros.calories} kcal</span>
+                            <span>{format(new Date(log.timestamp), 'h:mm a')}</span>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end justify-between h-full gap-2">
+                        <div className="text-right">
+                          <div className="text-[10px] font-display uppercase tracking-widest text-white/40 mb-1">Health</div>
                           <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-display",
-                            log.health_score >= 8 ? "bg-success/10 text-success border border-success/20" :
-                            log.health_score >= 5 ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                            "text-xs font-display px-2 py-1 rounded-md inline-block",
+                            log.health_score >= 8 ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
+                            log.health_score >= 5 ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" :
                             "bg-danger/10 text-danger border border-danger/20"
                           )}>
                             {log.health_score}
                           </div>
-                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); onToggleFavorite(log.id, !!log.isPinned); }}
-                              className={cn(
-                                "p-1.5 rounded-lg transition-colors",
-                                log.isPinned ? "bg-accent/10 text-accent hover:bg-accent/20" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-accent"
-                              )}
-                            >
-                              <Star className={cn("w-3 h-3", log.isPinned && "fill-accent")} />
-                            </button>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); onEditLog(log); }}
-                              className="p-1.5 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-lg transition-colors"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); onDeleteLog(log.id); }}
-                              className="p-1.5 bg-danger/10 hover:bg-danger/20 text-danger/40 hover:text-danger rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-4 mt-4 pt-4 border-t border-white/5">
+                        <motion.button 
+                          whileTap={{ scale: 0.9 }}
+                          onClick={(e) => { e.stopPropagation(); onToggleFavorite(log.id, !!log.isPinned); }}
+                          className={cn(
+                            "flex items-center gap-2 text-[10px] font-display uppercase tracking-widest transition-colors",
+                            log.isPinned ? "text-accent" : "text-white/40"
+                          )}
+                        >
+                          <Star className={cn("w-3 h-3", log.isPinned && "fill-accent")} /> {log.isPinned ? "Favorited" : "Favorite"}
+                        </motion.button>
+                        <motion.button 
+                          whileTap={{ scale: 0.9 }}
+                          onClick={(e) => { e.stopPropagation(); onEditLog(log); }}
+                          className="flex items-center gap-2 text-[10px] font-display uppercase tracking-widest text-white/40 transition-colors"
+                        >
+                          <Pencil className="w-3 h-3" /> Edit
+                        </motion.button>
+                        <motion.button 
+                          whileTap={{ scale: 0.9 }}
+                          onClick={(e) => { e.stopPropagation(); onDeleteLog(log.id); }}
+                          className="flex items-center gap-2 text-[10px] font-display uppercase tracking-widest text-white/40 transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" /> Delete
+                        </motion.button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Collapsible Activities List */}
+        <div className="space-y-4">
+          <button 
+            onClick={() => setIsActivitiesOpen(!isActivitiesOpen)}
+            className="vonas-card w-full flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/5 rounded-lg border border-white/10">
+                <Activity className="w-4 h-4 text-white/40 group-hover:text-accent transition-colors" />
+              </div>
+              <span className="text-sm font-display uppercase tracking-widest">Activities ({selectedActivities.length})</span>
+            </div>
+            {isActivitiesOpen ? <ChevronUp className="w-5 h-5 text-white/20" /> : <ChevronDown className="w-5 h-5 text-white/20" />}
+          </button>
+
+          <AnimatePresence>
+            {isActivitiesOpen && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden space-y-4"
+              >
+                {selectedActivities.length === 0 ? (
+                  <div className="text-center py-12 vonas-card border-dashed">
+                    <p className="text-white/20 text-[10px] font-display uppercase tracking-widest">No activities logged</p>
+                  </div>
+                ) : (
+                  selectedActivities.map(act => (
+                    <div 
+                      key={act.id} 
+                      className="vonas-card cursor-pointer hover:border-white/20 transition-colors"
+                      onClick={() => setSelectedActivity(act)}
+                    >
+                      <div className="flex gap-4 items-center">
+                        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                          <Activity className="w-5 h-5 text-accent" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-display uppercase tracking-wider truncate mb-1">{act.activity_name || act.activityName}</h3>
+                          <div className="flex items-center gap-3 text-[10px] font-display uppercase tracking-widest text-white/40">
+                            <span className="text-accent">{act.calories_burned} kcal burned</span>
+                            <span>{act.duration_minutes} min</span>
                           </div>
                         </div>
                       </div>
@@ -469,6 +531,13 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
         onEditLog={onEditLog}
         onDeleteLog={onDeleteLog}
         onToggleFavorite={onToggleFavorite}
+      />
+
+      <ActivityDetailsModal
+        activity={selectedActivity}
+        onClose={() => setSelectedActivity(null)}
+        onEditActivity={onEditActivity}
+        onDeleteActivity={onDeleteActivity}
       />
     </div>
   );

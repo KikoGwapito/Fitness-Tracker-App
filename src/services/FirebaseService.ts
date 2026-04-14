@@ -148,6 +148,68 @@ class FirebaseService {
     }
   }
 
+  // Activities
+  subscribeToActivities(uid: string, callback: (activities: any[]) => void) {
+    const activitiesRef = collection(db, `users/${uid}/activities`);
+    const q = query(activitiesRef, orderBy('timestamp', 'desc'));
+
+    return onSnapshot(q, (snapshot) => {
+      const activities = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toMillis?.() || Date.now(),
+      }));
+      callback(activities);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `users/${uid}/activities`);
+    });
+  }
+
+  async saveActivityToFirebase(uid: string, activityData: any) {
+    const activityRef = collection(db, `users/${uid}/activities`);
+    const data = {
+      userId: uid,
+      timestamp: serverTimestamp(),
+      activityName: activityData.activityName,
+      duration_minutes: activityData.duration_minutes,
+      calories_burned: activityData.calories_burned,
+      source: activityData.source || 'manual',
+      external_id: activityData.external_id || null
+    };
+    try {
+      return await addDoc(activityRef, data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `users/${uid}/activities`);
+      throw error;
+    }
+  }
+
+  async updateActivityToFirebase(uid: string, activityId: string, activityData: any) {
+    const activityRef = doc(db, `users/${uid}/activities`, activityId);
+    const data = {
+      activityName: activityData.activityName,
+      duration_minutes: activityData.duration_minutes,
+      calories_burned: activityData.calories_burned,
+      description: activityData.description || null,
+    };
+    try {
+      await updateDoc(activityRef, data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}/activities/${activityId}`);
+      throw error;
+    }
+  }
+
+  async deleteActivityFromFirebase(uid: string, activityId: string) {
+    const activityRef = doc(db, `users/${uid}/activities`, activityId);
+    try {
+      await deleteDoc(activityRef);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${uid}/activities/${activityId}`);
+      throw error;
+    }
+  }
+
   subscribeToMeals(uid: string, callback: (logs: FoodLog[]) => void) {
     const q = query(
       collection(db, `users/${uid}/food_logs`),

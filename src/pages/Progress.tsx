@@ -3,15 +3,16 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { FoodLog, UserProfile, DailyGoals } from '../types';
 import { format, subDays, subWeeks, subMonths, isSameDay, isSameWeek, isSameMonth } from 'date-fns';
 import { cn } from '../lib/utils';
-import { CheckCircle2, AlertCircle, Info, TrendingUp, PieChart } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Info, TrendingUp, PieChart, Activity } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface ProgressProps {
   logs: FoodLog[];
   profile: UserProfile | null;
+  activities?: any[];
 }
 
-export function Progress({ logs, profile }: ProgressProps) {
+export function Progress({ logs, profile, activities = [] }: ProgressProps) {
   const [view, setView] = useState<'daily' | 'weekly' | 'monthly' | 'annually'>('daily');
 
   const defaultGoals: DailyGoals = {
@@ -36,14 +37,19 @@ export function Progress({ logs, profile }: ProgressProps) {
       return Array.from({ length: 7 }).map((_, i) => {
         const date = subDays(now, 6 - i);
         const dayLogs = logs.filter(log => isSameDay(new Date(log.timestamp), date));
+        const dayActivities = activities.filter(act => isSameDay(new Date(act.timestamp), date));
+        const burned = dayActivities.reduce((sum, act) => sum + (act.calories_burned || 0), 0);
+        const consumed = dayLogs.reduce((sum, log) => sum + log.macros.calories, 0);
         return {
           name: format(date, 'EEE'),
-          calories: dayLogs.reduce((sum, log) => sum + log.macros.calories, 0),
+          calories: Math.max(0, consumed - burned),
           protein: dayLogs.reduce((sum, log) => sum + log.macros.protein, 0),
           carbs: dayLogs.reduce((sum, log) => sum + log.macros.carbs, 0),
           fat: dayLogs.reduce((sum, log) => sum + log.macros.fat, 0),
           sugar: dayLogs.reduce((sum, log) => sum + (log.sugar_g || 0), 0),
           sodium: dayLogs.reduce((sum, log) => sum + (log.sodium_mg || 0), 0),
+          burned,
+          duration: dayActivities.reduce((sum, act) => sum + (act.duration_minutes || 0), 0),
         };
       });
     } else if (view === 'weekly') {
@@ -51,14 +57,19 @@ export function Progress({ logs, profile }: ProgressProps) {
       return Array.from({ length: 4 }).map((_, i) => {
         const date = subWeeks(now, 3 - i);
         const weekLogs = logs.filter(log => isSameWeek(new Date(log.timestamp), date));
+        const weekActivities = activities.filter(act => isSameWeek(new Date(act.timestamp), date));
+        const burned = weekActivities.reduce((sum, act) => sum + (act.calories_burned || 0), 0);
+        const consumed = weekLogs.reduce((sum, log) => sum + log.macros.calories, 0);
         return {
           name: `W${4 - i}`,
-          calories: Math.round(weekLogs.reduce((sum, log) => sum + log.macros.calories, 0) / 7),
+          calories: Math.max(0, Math.round((consumed - burned) / 7)),
           protein: Math.round(weekLogs.reduce((sum, log) => sum + log.macros.protein, 0) / 7),
           carbs: Math.round(weekLogs.reduce((sum, log) => sum + log.macros.carbs, 0) / 7),
           fat: Math.round(weekLogs.reduce((sum, log) => sum + log.macros.fat, 0) / 7),
           sugar: Math.round(weekLogs.reduce((sum, log) => sum + (log.sugar_g || 0), 0) / 7),
           sodium: Math.round(weekLogs.reduce((sum, log) => sum + (log.sodium_mg || 0), 0) / 7),
+          burned: Math.round(burned / 7),
+          duration: Math.round(weekActivities.reduce((sum, act) => sum + (act.duration_minutes || 0), 0) / 7),
         };
       });
     } else if (view === 'monthly') {
@@ -66,14 +77,19 @@ export function Progress({ logs, profile }: ProgressProps) {
       return Array.from({ length: 6 }).map((_, i) => {
         const date = subMonths(now, 5 - i);
         const monthLogs = logs.filter(log => isSameMonth(new Date(log.timestamp), date));
+        const monthActivities = activities.filter(act => isSameMonth(new Date(act.timestamp), date));
+        const burned = monthActivities.reduce((sum, act) => sum + (act.calories_burned || 0), 0);
+        const consumed = monthLogs.reduce((sum, log) => sum + log.macros.calories, 0);
         return {
           name: format(date, 'MMM'),
-          calories: Math.round(monthLogs.reduce((sum, log) => sum + log.macros.calories, 0) / 30),
+          calories: Math.max(0, Math.round((consumed - burned) / 30)),
           protein: Math.round(monthLogs.reduce((sum, log) => sum + log.macros.protein, 0) / 30),
           carbs: Math.round(monthLogs.reduce((sum, log) => sum + log.macros.carbs, 0) / 30),
           fat: Math.round(monthLogs.reduce((sum, log) => sum + log.macros.fat, 0) / 30),
           sugar: Math.round(monthLogs.reduce((sum, log) => sum + (log.sugar_g || 0), 0) / 30),
           sodium: Math.round(monthLogs.reduce((sum, log) => sum + (log.sodium_mg || 0), 0) / 30),
+          burned: Math.round(burned / 30),
+          duration: Math.round(monthActivities.reduce((sum, act) => sum + (act.duration_minutes || 0), 0) / 30),
         };
       });
     } else {
@@ -81,18 +97,23 @@ export function Progress({ logs, profile }: ProgressProps) {
       return Array.from({ length: 12 }).map((_, i) => {
         const date = subMonths(now, 11 - i);
         const monthLogs = logs.filter(log => isSameMonth(new Date(log.timestamp), date));
+        const monthActivities = activities.filter(act => isSameMonth(new Date(act.timestamp), date));
+        const burned = monthActivities.reduce((sum, act) => sum + (act.calories_burned || 0), 0);
+        const consumed = monthLogs.reduce((sum, log) => sum + log.macros.calories, 0);
         return {
           name: format(date, 'MMM'),
-          calories: Math.round(monthLogs.reduce((sum, log) => sum + log.macros.calories, 0) / 30),
+          calories: Math.max(0, Math.round((consumed - burned) / 30)),
           protein: Math.round(monthLogs.reduce((sum, log) => sum + log.macros.protein, 0) / 30),
           carbs: Math.round(monthLogs.reduce((sum, log) => sum + log.macros.carbs, 0) / 30),
           fat: Math.round(monthLogs.reduce((sum, log) => sum + log.macros.fat, 0) / 30),
           sugar: Math.round(monthLogs.reduce((sum, log) => sum + (log.sugar_g || 0), 0) / 30),
           sodium: Math.round(monthLogs.reduce((sum, log) => sum + (log.sodium_mg || 0), 0) / 30),
+          burned: Math.round(burned / 30),
+          duration: Math.round(monthActivities.reduce((sum, act) => sum + (act.duration_minutes || 0), 0) / 30),
         };
       });
     }
-  }, [logs, view]);
+  }, [logs, view, activities]);
 
   const notifications = useMemo(() => {
     const today = new Date();
@@ -274,6 +295,65 @@ export function Progress({ logs, profile }: ProgressProps) {
               <div className={cn("w-2 h-2 rounded-full", item.color)} /> {item.label}
             </div>
           ))}
+        </div>
+      </div>
+      {/* Activity Trend */}
+      <div className="vonas-card">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="p-2 bg-white/5 rounded-lg border border-white/10">
+            <Activity className="w-4 h-4 text-accent" />
+          </div>
+          <h3 className="text-sm font-display uppercase tracking-widest text-white">Activity Trend</h3>
+        </div>
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <XAxis 
+                dataKey="name" 
+                stroke="rgba(255,255,255,0.2)" 
+                fontSize={10} 
+                fontFamily="Anton"
+                tickLine={false} 
+                axisLine={false} 
+              />
+              <YAxis 
+                stroke="rgba(255,255,255,0.2)" 
+                fontSize={10} 
+                fontFamily="Anton"
+                tickLine={false} 
+                axisLine={false} 
+              />
+              <Tooltip 
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-bg/90 border border-white/10 rounded-xl p-3 backdrop-blur-xl shadow-xl">
+                        <p className="text-white font-display uppercase tracking-widest mb-2">{label}</p>
+                        <div className="space-y-1">
+                          <p className="text-accent text-xs font-display uppercase tracking-wider">
+                            {data.burned} kcal burned
+                          </p>
+                          <p className="text-blue-400 text-xs font-display uppercase tracking-wider">
+                            {data.duration} min duration
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+              />
+              <Bar dataKey="burned" name="Calories Burned" fill="var(--c-accent)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex justify-center gap-4 flex-wrap mt-8">
+          <div className="flex items-center gap-2 text-[8px] font-display uppercase tracking-widest text-white/40">
+            <div className="w-2 h-2 rounded-full bg-accent" /> Calories Burned
+          </div>
         </div>
       </div>
     </div>

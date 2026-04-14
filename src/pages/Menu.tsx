@@ -13,23 +13,17 @@ interface MenuProps {
   logs: FoodLog[];
 }
 
-const ACCENT_COLORS = [
-  { name: 'Vonas Orange', value: '#F27D26' },
-  { name: 'Neon Green', value: '#00FF00' },
-  { name: 'Electric Blue', value: '#00D1FF' },
-  { name: 'Hot Pink', value: '#FF007A' },
-  { name: 'Royal Purple', value: '#9D00FF' },
-  { name: 'Amber', value: '#F59E0B' },
-  { name: 'Emerald', value: '#10B981' },
-  { name: 'Indigo', value: '#6366F1' },
-  { name: 'Rose', value: '#F43F5E' },
-  { name: 'Cyan', value: '#06B6D4' },
-];
-
 const FONT_SIZES: { label: string; value: UserSettings['fontSize'] }[] = [
   { label: 'Small', value: 'small' },
   { label: 'Medium', value: 'medium' },
   { label: 'Large', value: 'large' },
+];
+
+const FONT_FAMILIES: { label: string; value: string }[] = [
+  { label: 'Anton (Default)', value: 'Anton, sans-serif' },
+  { label: 'Oswald (Fitness)', value: 'Oswald, sans-serif' },
+  { label: 'Bebas Neue (Bold)', value: 'Bebas Neue, sans-serif' },
+  { label: 'Inter (Clean)', value: 'Inter, sans-serif' },
 ];
 
 export function MenuScreen({ onNavigate, onLogout, onUpdateSettings, userEmail, profile, logs }: MenuProps) {
@@ -51,9 +45,10 @@ export function MenuScreen({ onNavigate, onLogout, onUpdateSettings, userEmail, 
   const bmiStatus = getBmiStatus(bmi);
 
   const currentSettings: UserSettings = profile?.settings || {
-    accentColor: '#F27D26',
+    accentColor: '#FFA0A0',
     fontSize: 'medium',
     theme: 'dark',
+    fontFamily: 'Anton, sans-serif'
   };
 
   return (
@@ -149,19 +144,22 @@ export function MenuScreen({ onNavigate, onLogout, onUpdateSettings, userEmail, 
                   <Palette className="w-4 h-4 text-accent" />
                   <h3 className="text-xs font-display uppercase tracking-widest">Accent Color</h3>
                 </div>
-                <div className="flex flex-wrap gap-4">
-                  {ACCENT_COLORS.map((color) => (
-                    <button
-                      key={color.value}
-                      onClick={() => onUpdateSettings({ ...currentSettings, accentColor: color.value })}
-                      className={cn(
-                        "w-10 h-10 rounded-full border-4 transition-all duration-300",
-                        currentSettings.accentColor === color.value ? "border-white scale-110" : "border-transparent opacity-40 hover:opacity-100"
-                      )}
-                      style={{ backgroundColor: color.value }}
-                      title={color.name}
+                <div className="flex items-center gap-4">
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white/20 shadow-lg">
+                    <input
+                      type="color"
+                      value={currentSettings.accentColor}
+                      onChange={(e) => onUpdateSettings({ ...currentSettings, accentColor: e.target.value })}
+                      className="absolute -inset-2 w-16 h-16 cursor-pointer opacity-0 z-10"
                     />
-                  ))}
+                    <div 
+                      className="absolute inset-0 pointer-events-none" 
+                      style={{ backgroundColor: currentSettings.accentColor }} 
+                    />
+                  </div>
+                  <div className="text-sm font-display uppercase tracking-widest text-white/60">
+                    {currentSettings.accentColor}
+                  </div>
                 </div>
               </div>
 
@@ -184,6 +182,31 @@ export function MenuScreen({ onNavigate, onLogout, onUpdateSettings, userEmail, 
                       )}
                     >
                       {size.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Font Family */}
+              <div className="vonas-card space-y-6">
+                <div className="flex items-center gap-3">
+                  <Type className="w-4 h-4 text-accent" />
+                  <h3 className="text-xs font-display uppercase tracking-widest">Font Style</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {FONT_FAMILIES.map((font) => (
+                    <button
+                      key={font.value}
+                      onClick={() => onUpdateSettings({ ...currentSettings, fontFamily: font.value })}
+                      className={cn(
+                        "py-4 rounded-xl border font-display uppercase text-[10px] tracking-widest transition-all",
+                        currentSettings.fontFamily === font.value 
+                          ? "bg-accent text-bg border-accent" 
+                          : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"
+                      )}
+                      style={{ fontFamily: font.value }}
+                    >
+                      {font.label}
                     </button>
                   ))}
                 </div>

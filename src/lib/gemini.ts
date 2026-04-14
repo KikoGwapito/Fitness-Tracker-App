@@ -166,3 +166,68 @@ Once the user confirms a choice or describes the meal, set status = "confirmed" 
     throw new Error("Failed to parse JSON response from AI.");
   }
 }
+
+export async function analyzeActivity(description: string, profile: any, previousContext?: any) {
+  const ai = getAI();
+  const prompt = `User description: "${description}"\n\nUser Profile: Weight: ${profile?.weight_kg || 'unknown'}kg, Height: ${profile?.height_cm || 'unknown'}cm, Age: ${profile?.age || 'unknown'}, Gender: ${profile?.gender || 'unknown'}\n\nPrevious context: ${previousContext ? JSON.stringify(previousContext) : 'None'}`;
+  
+  const modelsToTry = ["gemini-3-flash-preview", "gemini-3.1-flash-lite-preview"];
+  let response;
+  let lastError;
+
+  for (const modelName of modelsToTry) {
+    try {
+      response = await ai.models.generateContent({
+        model: modelName,
+        contents: { parts: [{ text: prompt }] },
+        config: {
+          systemInstruction: `You are an expert fitness AI coach. 
+Your goal is to accurately calculate calories burned based on the user's activity description and their profile (weight, height, age, gender).
+If the user's description lacks crucial information to make a reasonable estimate (e.g., they say "I ran" but don't specify duration or distance), you MUST ask a follow-up question.
+If you have enough information to make a good estimate, calculate the calories burned and return status "success".
+
+Respond ONLY in JSON format:
+{
+  "status": "success" | "needs_clarification",
+  "activityName": "String (e.g., 'Morning Run', 'Weightlifting')",
+  "duration_minutes": number (if known, else 0),
+  "calories_burned": number (if known, else 0),
+  "question": "String (Ask a follow-up question if status is needs_clarification, else empty string)"
+}`,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              status: { type: Type.STRING, enum: ["success", "needs_clarification"] },
+              activityName: { type: Type.STRING },
+              duration_minutes: { type: Type.INTEGER },
+              calories_burned: { type: Type.INTEGER },
+              question: { type: Type.STRING }
+            },
+            required: ["status", "activityName", "duration_minutes", "calories_burned", "question"]
+          }
+        }
+      });
+      break;
+    } catch (error) {
+      lastError = error;
+      console.warn(`[${modelName}] Failed for analyzeActivity. Trying next...`);
+    }
+  }
+
+  if (!response || !response.text) {
+    throw lastError || new Error("Failed to generate activity analysis");
+  }
+
+  let text = response.text.trim();
+  if (text.startsWith('```')) {
+    text = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Failed to parse JSON from Gemini:", text);
+    throw new Error("Invalid response format from AI");
+  }
+}

@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { FoodLog, DailyGoals, UserProfile } from '../types';
 import { format, addDays } from 'date-fns';
 import { useHolidays } from './useHolidays';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 const NOTIFICATION_STATE_KEY = 'vonas_notification_state';
 
@@ -21,9 +23,23 @@ export function useNotifications(
   const { holidays } = useHolidays(profile?.country, new Date().getFullYear());
 
   useEffect(() => {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    // Check permissions for Native or Web
+    const checkPermissions = async () => {
+      if (Capacitor.isNativePlatform()) {
+        const permStatus = await LocalNotifications.checkPermissions();
+        if (permStatus.display !== 'granted') {
+          await LocalNotifications.requestPermissions();
+        }
+      } else {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return false;
+      }
+      return true;
+    };
 
-    const checkNotifications = () => {
+    const checkNotifications = async () => {
+      const hasPermission = await checkPermissions();
+      if (!hasPermission && !Capacitor.isNativePlatform()) return;
+
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       const savedState = localStorage.getItem(NOTIFICATION_STATE_KEY);
       let state: NotificationState = savedState 
@@ -36,18 +52,35 @@ export function useNotifications(
 
       let stateChanged = false;
 
-      const sendNotify = (title: string, body: string) => {
-        if (Notification.permission !== 'granted') return;
-        navigator.serviceWorker.ready.then(registration => {
-          registration.showNotification(title, {
-            body,
-            icon: '/vite.svg',
-            badge: '/vite.svg',
-            vibrate: [200, 100, 200]
+      const sendNotify = async (title: string, body: string, id: number) => {
+        if (Capacitor.isNativePlatform()) {
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                title,
+                body,
+                id,
+                schedule: { at: new Date(Date.now() + 1000) }, // Schedule 1 second from now
+                sound: null,
+                attachments: null,
+                actionTypeId: '',
+                extra: null
+              }
+            ]
           });
-        }).catch(() => {
-          new Notification(title, { body, icon: '/vite.svg' });
-        });
+        } else {
+          if (Notification.permission !== 'granted') return;
+          navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification(title, {
+              body,
+              icon: '/vite.svg',
+              badge: '/vite.svg',
+              vibrate: [200, 100, 200]
+            });
+          }).catch(() => {
+            new Notification(title, { body, icon: '/vite.svg' });
+          });
+        }
       };
 
       const todayLogs = logs.filter(log => {
@@ -74,28 +107,28 @@ export function useNotifications(
 
       // 1. Macros Exceeded
       const macroChecks = [
-        { key: 'calories', name: 'Calories', limit: goals.calories },
-        { key: 'protein_g', name: 'Protein', limit: goals.protein_g },
-        { key: 'carbs_g', name: 'Carbs', limit: goals.carbs_g },
-        { key: 'fat_g', name: 'Fat', limit: goals.fat_g },
-        { key: 'sugar_g', name: 'Sugar', limit: goals.sugar_g },
-        { key: 'sodium_mg', name: 'Sodium', limit: goals.sodium_mg },
+        { key: 'calories', name: 'Calories', limit: goals.calories, id: 101 },
+        { key: 'protein_g', name: 'Protein', limit: goals.protein_g, id: 102 },
+        { key: 'carbs_g', name: 'Carbs', limit: goals.carbs_g, id: 103 },
+        { key: 'fat_g', name: 'Fat', limit: goals.fat_g, id: 104 },
+        { key: 'sugar_g', name: 'Sugar', limit: goals.sugar_g, id: 105 },
+        { key: 'sodium_mg', name: 'Sodium', limit: goals.sodium_mg, id: 106 },
       ];
 
-      macroChecks.forEach(macro => {
+      for (const macro of macroChecks) {
         if (totals[macro.key as keyof typeof totals] > macro.limit && !state.macrosExceeded.includes(macro.key)) {
-          sendNotify('Macro Limit Exceeded', `You have exceeded your daily limit for ${macro.name}.`);
+          await sendNotify('Macro Limit Exceeded', `You have exceeded your daily limit for ${macro.name}.`, macro.id);
           state.macrosExceeded.push(macro.key);
           stateChanged = true;
         }
-      });
+      }
 
       // 2. End of day warning (after 8 PM = 20:00)
       const currentHour = new Date().getHours();
       if (currentHour >= 20 && !state.endOfDayWarning) {
         const isUnderGoals = totals.calories < goals.calories * 0.8;
         if (isUnderGoals) {
-          sendNotify('End of Day Reminder', "You haven't hit your nutrition goals for today yet. Don't forget to log your evening meals!");
+          await sendNotify('End of Day Reminder', "You haven't hit your nutrition goals for today yet. Don't forget to log your evening meals!", 201);
           state.endOfDayWarning = true;
           stateChanged = true;
         }
@@ -113,7 +146,7 @@ export function useNotifications(
         if (todaySchedule && todaySchedule.trim() !== '') eventTexts.push(`Schedule: ${todaySchedule}`);
 
         if (eventTexts.length > 0) {
-          sendNotify("Today's Occasions", eventTexts.join(' '));
+          await sendNotify("Today's Occasions", eventTexts.join(' '), 301);
           state.todayEvents = true;
           stateChanged = true;
         }
@@ -133,7 +166,7 @@ export function useNotifications(
         if (tomorrowSchedule && tomorrowSchedule.trim() !== '') upcomingTexts.push(`Schedule tomorrow: ${tomorrowSchedule}`);
 
         if (upcomingTexts.length > 0) {
-          sendNotify("Upcoming Occasions", upcomingTexts.join(' '));
+          await sendNotify("Upcoming Occasions", upcomingTexts.join(' '), 401);
           state.upcomingEvents = true;
           stateChanged = true;
         }

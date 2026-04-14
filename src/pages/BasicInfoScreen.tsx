@@ -60,7 +60,9 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
 
     // Adjust for goal
     if (goal === 'lose') tdee -= 500;
+    if (goal === 'extreme_lose') tdee -= 1000;
     if (goal === 'gain') tdee += 500;
+    if (goal === 'extreme_gain') tdee += 1000;
 
     const calories = Math.round(tdee);
     
@@ -255,25 +257,31 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
           <div className="space-y-2">
             <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Target Goal</label>
             {isEditing ? (
-              <div className="grid grid-cols-3 gap-4">
-                {['lose', 'maintain', 'gain'].map((g) => (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {[
+                  { id: 'extreme_lose', label: 'Extreme Lose' },
+                  { id: 'lose', label: 'Lose' },
+                  { id: 'maintain', label: 'Maintain' },
+                  { id: 'gain', label: 'Gain' },
+                  { id: 'extreme_gain', label: 'Extreme Gain' }
+                ].map((g) => (
                   <button
-                    key={g}
-                    onClick={() => setFormData({ ...formData, goal: g as any })}
+                    key={g.id}
+                    onClick={() => setFormData({ ...formData, goal: g.id as any })}
                     className={cn(
-                      "py-4 rounded-2xl text-[10px] font-display uppercase tracking-widest transition-all border",
-                      formData.goal === g 
+                      "py-4 px-2 rounded-2xl text-[10px] font-display uppercase tracking-widest transition-all border text-center",
+                      formData.goal === g.id 
                         ? "bg-accent border-accent text-bg" 
                         : "bg-white/5 border-white/10 text-white/40 hover:border-white/20"
                     )}
                   >
-                    {g}
+                    {g.label}
                   </button>
                 ))}
               </div>
             ) : (
               <div className="text-xl font-display uppercase text-white">
-                {formData.goal} Weight
+                {formData.goal.replace('_', ' ')} Weight
               </div>
             )}
           </div>

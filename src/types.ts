@@ -17,6 +17,23 @@ export interface UserProfile {
   country?: string;
   language?: string;
   birthday?: string;
+  connected_apps?: {
+    strava?: boolean;
+    strava_token?: string;
+    strava_refresh_token?: string;
+    strava_expires_at?: number;
+  };
+}
+
+export interface ActivityLog {
+  id: string;
+  userId: string;
+  activityName: string;
+  timestamp: any;
+  duration_minutes: number;
+  calories_burned: number;
+  source: 'manual' | 'strava' | 'apple_health' | 'samsung_health';
+  external_id?: string;
 }
 
 export interface DailyGoals {
@@ -33,6 +50,7 @@ export interface UserSettings {
   theme: 'dark' | 'light' | 'system';
   accentColor?: string;
   fontSize?: string;
+  fontFamily?: string;
 }
 
 export interface FoodLog {

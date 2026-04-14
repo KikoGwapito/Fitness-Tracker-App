@@ -4,18 +4,23 @@ import { FoodLog } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { MealDetailsModal } from '../components/MealDetailsModal';
 
 interface FavoritesProps {
   logs: FoodLog[];
   onBack: () => void;
   onLogFavorite: (log: FoodLog) => void;
   onRemoveFavorites: (foodNames: string[]) => void;
+  onEditLog: (log: FoodLog) => void;
+  onDeleteLog: (logId: string) => void;
+  onToggleFavorite: (logId: string, currentPinnedStatus: boolean) => void;
 }
 
-export function FavoritesScreen({ logs, onBack, onLogFavorite, onRemoveFavorites }: FavoritesProps) {
+export function FavoritesScreen({ logs, onBack, onLogFavorite, onRemoveFavorites, onEditLog, onDeleteLog, onToggleFavorite }: FavoritesProps) {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedMeals, setSelectedMeals] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMealLog, setSelectedMealLog] = useState<FoodLog | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -149,9 +154,15 @@ export function FavoritesScreen({ logs, onBack, onLogFavorite, onRemoveFavorites
                 onPointerUp={handlePressEnd}
                 onPointerLeave={handlePressEnd}
                 onContextMenu={(e) => e.preventDefault()}
-                onClick={() => selectionMode && toggleSelection(foodNameLower)}
+                onClick={() => {
+                  if (selectionMode) {
+                    toggleSelection(foodNameLower);
+                  } else {
+                    setSelectedMealLog(log);
+                  }
+                }}
                 className={cn(
-                  "vonas-card p-5 flex items-center justify-between group gap-4 select-none transition-colors",
+                  "vonas-card p-5 flex items-center justify-between group gap-4 select-none transition-colors cursor-pointer",
                   selectionMode && isSelected ? "border-accent bg-accent/5" : ""
                 )}
               >
@@ -248,6 +259,14 @@ export function FavoritesScreen({ logs, onBack, onLogFavorite, onRemoveFavorites
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
         variant="danger"
+      />
+
+      <MealDetailsModal 
+        log={selectedMealLog} 
+        onClose={() => setSelectedMealLog(null)} 
+        onEditLog={onEditLog}
+        onDeleteLog={onDeleteLog}
+        onToggleFavorite={onToggleFavorite}
       />
     </div>
   );
