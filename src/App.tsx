@@ -18,7 +18,7 @@ import { MenuScreen } from './pages/Menu';
 import { AppInfo } from './pages/AppInfo';
 import { FavoritesScreen } from './pages/Favorites';
 import { ConfirmModal } from './components/ConfirmModal';
-import { ActivityModal } from './components/ActivityModal';
+import { AICoachModal } from './components/AICoachModal';
 import { useNotifications } from './lib/useNotifications';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
@@ -39,7 +39,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [subPage, setSubPage] = useState<'none' | 'profile' | 'basic-info' | 'app-info' | 'favorites'>('none');
   const [logs, setLogs] = useState<FoodLog[]>([]);
-  const [activities, setActivities] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<Record<string, string>>({});
 
   // Initialize notifications
@@ -89,9 +88,9 @@ export default function App() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageMimeType, setImageMimeType] = useState<string | null>(null);
   const [editingLog, setEditingLog] = useState<FoodLog | null>(null);
-  const [editingActivity, setEditingActivity] = useState<any | null>(null);
+  const [editingMode, setEditingMode] = useState<'recent' | 'favorite' | null>(null);
   const [shouldTriggerCamera, setShouldTriggerCamera] = useState(false);
-  const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+  const [isAICoachModalOpen, setIsAICoachModalOpen] = useState(false);
   const [pendingAnalysis, setPendingAnalysis] = useState<{
     clarification_required: string;
     reason: string;
@@ -172,14 +171,10 @@ export default function App() {
     // Schedules listener
     const schedulesUnsubscribe = firebaseService.subscribeToSchedules(user.uid, setSchedules);
 
-    // Activities listener
-    const activitiesUnsubscribe = firebaseService.subscribeToActivities(user.uid, setActivities);
-
     return () => {
       profileUnsubscribe();
       logsUnsubscribe();
       schedulesUnsubscribe();
-      activitiesUnsubscribe();
     };
   }, [user, isAuthReady]);
 
@@ -291,29 +286,6 @@ export default function App() {
     });
   };
 
-  const handleDeleteActivity = async (activityId: string) => {
-    if (!user) return;
-    setConfirmModal({
-      isOpen: true,
-      title: 'Delete Activity',
-      message: 'Are you sure you want to delete this activity? This action cannot be undone.',
-      variant: 'danger',
-      onConfirm: async () => {
-        try {
-          await firebaseService.deleteActivityFromFirebase(user.uid, activityId);
-          setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        } catch (error) {
-          console.error('Delete failed:', error);
-        }
-      }
-    });
-  };
-
-  const handleEditActivity = (activity: any) => {
-    setEditingActivity(activity);
-    setIsActivityModalOpen(true);
-  };
-
   const handleRemoveFavorites = async (foodNames: string[]) => {
     if (!user) return;
     const lowerNames = foodNames.map(n => n.toLowerCase());
@@ -328,11 +300,10 @@ export default function App() {
     }
   };
 
-  const handleEditLog = (log: FoodLog) => {
+  const handleEditLog = (log: FoodLog, mode: 'recent' | 'favorite' = 'recent') => {
     setEditingLog(log);
+    setEditingMode(mode);
     setTextInput(log.foodName);
-    // Note: We don't restore the image for editing to save bandwidth/complexity, 
-    // but we could if we stored the URL.
     setIsLogging(true);
   };
 
@@ -391,7 +362,7 @@ export default function App() {
       if (result.status === 'pending' || result.status === 'confirmed') {
         // If confirmed, we inject the favorite options manually
         const options = result.status === 'confirmed' 
-          ? ["Log Meal Only", "Log & Add to Favorites"]
+          ? (editingLog ? (editingMode === 'favorite' ? ["Update Favorite"] : ["Update Meal"]) : ["Log Meal Only", "Log & Add to Favorites"])
           : result.quick_options || null;
 
         setPendingAnalysis({
@@ -433,15 +404,44 @@ export default function App() {
       };
       
       if (editingLog) {
-        // Update existing
-        const updateData: any = {
-          ...mealData,
-          food_name: textInput || mealData.food_name,
-        };
-        if (finalImageUrl) {
-          updateData.image_url = finalImageUrl;
+        if (editingMode === 'favorite') {
+          // Remove old favorites with the original name
+          const originalName = editingLog.foodName || '';
+          const lowerName = originalName.toLowerCase();
+          const logsToUpdate = logs.filter(l => l.isPinned && (l.foodName || '').toLowerCase() === lowerName);
+          
+          for (const log of logsToUpdate) {
+            if (log.deletedFromLogs) {
+              await firebaseService.deleteMealFromFirebase(user!.uid, log.id);
+            } else {
+              await firebaseService.updateMealInFirebase(user!.uid, log.id, { isPinned: false });
+            }
+          }
+          
+          // Create the new favorite template
+          await firebaseService.saveMealToFirebase(user!.uid, {
+            ...mealData,
+            isPinned: true,
+            deletedFromLogs: true, // Hide from recent meals
+            food_name: textInput || mealData.food_name,
+            image_url: finalImageUrl || editingLog.image_url
+          }, result.status === 'confirmed');
+        } else {
+          // editingMode === 'recent'
+          if (editingLog.isPinned) {
+            // Hide the old pinned meal from recent logs, but keep it in DB for favorites
+            await firebaseService.updateMealInFirebase(user!.uid, editingLog.id, { deletedFromLogs: true });
+          } else {
+            // Completely delete the old unpinned meal
+            await firebaseService.deleteMealFromFirebase(user!.uid, editingLog.id);
+          }
+          
+          await firebaseService.saveMealToFirebase(user!.uid, {
+            ...mealData,
+            food_name: textInput || mealData.food_name,
+            image_url: finalImageUrl || editingLog.image_url
+          }, result.status === 'confirmed');
         }
-        await firebaseService.updateMealInFirebase(user!.uid, editingLog.id, updateData);
       } else {
         // Create new
         await firebaseService.saveMealToFirebase(user!.uid, {
@@ -452,6 +452,7 @@ export default function App() {
 
       setIsLogging(false);
       setEditingLog(null);
+      setEditingMode(null);
       setPendingAnalysis(null);
       setTextInput('');
       setSelectedImage(null);
@@ -486,7 +487,7 @@ export default function App() {
       status: 'confirmed',
       clarification_required: null,
       reason: null,
-      isPinned: true, // Keep it pinned
+      isPinned: true, // Keep it pinned so it shows as favorited in recent meals
     };
 
     try {
@@ -582,11 +583,11 @@ export default function App() {
             </h1>
             <motion.button 
               whileTap={{ scale: 0.9 }}
-              onClick={() => setIsActivityModalOpen(true)}
+              onClick={() => setIsAICoachModalOpen(true)}
               className="px-3 py-2 rounded-full bg-white/5 flex items-center gap-2 border border-white/10 transition-colors"
             >
-              <Plus className="w-4 h-4 text-accent" />
-              <span className="text-[10px] font-display uppercase tracking-widest text-white">Activity</span>
+              <MessageSquare className="w-4 h-4 text-accent" />
+              <span className="text-[10px] font-display uppercase tracking-widest text-white">AI Coach</span>
             </motion.button>
           </header>
 
@@ -596,7 +597,6 @@ export default function App() {
                 user={user} 
                 profile={profile} 
                 logs={activeLogs} 
-                activities={activities}
                 onDeleteLog={handleDeleteLog} 
                 onEditLog={handleEditLog} 
                 onToggleFavorite={handleToggleFavorite}
@@ -606,11 +606,8 @@ export default function App() {
             {activeTab === 'history' && (
               <History 
                 logs={activeLogs} 
-                activities={activities}
                 onEditLog={handleEditLog} 
                 onDeleteLog={handleDeleteLog} 
-                onEditActivity={handleEditActivity}
-                onDeleteActivity={handleDeleteActivity}
                 profile={profile} 
                 onToggleFavorite={handleToggleFavorite}
                 schedules={schedules}
@@ -621,7 +618,7 @@ export default function App() {
                 }}
               />
             )}
-            {activeTab === 'progress' && <Progress logs={activeLogs} profile={profile} activities={activities} />}
+            {activeTab === 'progress' && <Progress logs={activeLogs} profile={profile} />}
             
             {activeTab === 'menu' && subPage === 'none' && (
               <MenuScreen 
@@ -656,7 +653,7 @@ export default function App() {
                 onBack={() => setSubPage('none')} 
                 onLogFavorite={handleLogFavorite}
                 onRemoveFavorites={handleRemoveFavorites}
-                onEditLog={handleEditLog}
+                onEditLog={(log) => handleEditLog(log, 'favorite')}
                 onDeleteLog={handleDeleteLog}
                 onToggleFavorite={handleToggleFavorite}
               />
@@ -718,11 +715,14 @@ export default function App() {
               </AnimatePresence>
 
               <div className="px-6 pt-12 pb-4 flex items-center justify-between border-b border-white/5 max-w-2xl mx-auto w-full">
-                <h2 className="text-2xl font-display uppercase text-white">{editingLog ? 'Edit Meal' : 'Log Meal'}</h2>
+                <h2 className="text-2xl font-display uppercase text-white">
+                  {editingLog ? (editingMode === 'favorite' ? 'Edit Favorite' : 'Edit Meal') : 'Log Meal'}
+                </h2>
                 <button 
                   onClick={() => {
                     setIsLogging(false);
                     setEditingLog(null);
+                    setEditingMode(null);
                   }}
                   className="p-2 bg-white/5 rounded-full text-ink/40 hover:text-white"
                 >
@@ -772,12 +772,15 @@ export default function App() {
                             <button
                               key={idx}
                               onClick={() => {
-                                const isPinned = option.includes("Favorite");
+                                let isPinned = option.includes("Favorite");
+                                if (editingMode === 'favorite') {
+                                  isPinned = true; // Always pin when updating a favorite
+                                }
                                 saveConfirmedMeal(pendingAnalysis.data, pendingAnalysis.data.finalImageUrl, isPinned);
                               }}
                               className={cn(
                                 "w-full py-4 rounded-2xl text-sm font-display uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2",
-                                option.includes("Favorite") 
+                                option.includes("Favorite") || option.includes("Update")
                                   ? "bg-accent text-bg hover:bg-accent/90" 
                                   : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
                               )}
@@ -905,7 +908,7 @@ export default function App() {
                         ) : (
                           <>
                             <Flame className="w-5 h-5" />
-                            <span>{editingLog ? 'Update & Re-analyze' : 'Analyze & Log'}</span>
+                            <span>{editingLog ? (editingMode === 'favorite' ? 'Update Favorite & Re-analyze' : 'Update & Re-analyze') : 'Analyze & Log'}</span>
                           </>
                         )}
                       </button>
@@ -942,23 +945,33 @@ export default function App() {
           onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
         />
 
-        {/* Activity Modal */}
-        <ActivityModal 
-          isOpen={isActivityModalOpen}
-          onClose={() => {
-            setIsActivityModalOpen(false);
-            setEditingActivity(null);
-          }}
+        {/* AI Coach Modal */}
+        <AICoachModal 
+          isOpen={isAICoachModalOpen}
+          onClose={() => setIsAICoachModalOpen(false)}
           profile={profile}
-          editingActivity={editingActivity}
-          onSave={async (activity) => {
+          onLogSuggestedMeal={(meal) => {
+            // Directly save the suggested meal
             if (user) {
-              if (editingActivity) {
-                await firebaseService.updateActivityToFirebase(user.uid, editingActivity.id, activity);
-              } else {
-                await firebaseService.saveActivityToFirebase(user.uid, activity);
-              }
-              setEditingActivity(null);
+              const mealData = {
+                foodName: meal.foodName,
+                calories: meal.calories,
+                protein: meal.protein,
+                carbs: meal.carbs,
+                fat: meal.fat,
+                sugar_g: 0,
+                sodium_mg: 0,
+                health_score: 8, // Default good score for AI suggested meals
+                coach_tip: "Great choice! This meal aligns with your goals.",
+                status: 'confirmed',
+                clarification_required: null,
+                reason: null,
+                isPinned: false,
+              };
+              firebaseService.saveMealToFirebase(user.uid, mealData, true).catch(err => {
+                console.error("Failed to log suggested meal:", err);
+                alert("Failed to log meal. Please try again.");
+              });
             }
           }}
         />

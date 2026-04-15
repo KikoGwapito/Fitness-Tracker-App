@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Activity, Flame, Beef, Droplets, MessageSquare, Trash2, Edit2, Star, CalendarHeart, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { MacroRing } from '../components/MacroRing';
@@ -13,30 +13,32 @@ interface DashboardProps {
   user: User;
   profile: UserProfile | null;
   logs: FoodLog[];
-  activities?: any[];
   onDeleteLog: (logId: string) => void;
   onEditLog: (log: FoodLog) => void;
   onToggleFavorite: (logId: string, currentPinnedStatus: boolean) => void;
   schedules?: Record<string, string>;
 }
 
-export function Dashboard({ user, profile, logs, activities = [], onDeleteLog, onEditLog, onToggleFavorite, schedules = {} }: DashboardProps) {
+export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggleFavorite, schedules = {} }: DashboardProps) {
   const [selectedMeal, setSelectedMeal] = useState<FoodLog | null>(null);
   const { holidays } = useHolidays(profile?.country, new Date().getFullYear());
+
+  useEffect(() => {
+    if (selectedMeal) {
+      const updatedMeal = logs.find(l => l.id === selectedMeal.id);
+      if (updatedMeal) {
+        setSelectedMeal(updatedMeal);
+      } else {
+        setSelectedMeal(null);
+      }
+    }
+  }, [logs]);
 
   const todayLogs = logs.filter(log => {
     const today = new Date().setHours(0, 0, 0, 0);
     const logDate = new Date(log.timestamp).setHours(0, 0, 0, 0);
     return today === logDate;
   });
-
-  const todayActivities = activities.filter(act => {
-    const today = new Date().setHours(0, 0, 0, 0);
-    const actDate = new Date(act.timestamp).setHours(0, 0, 0, 0);
-    return today === actDate;
-  });
-
-  const burnedCalories = todayActivities.reduce((acc, act) => acc + (act.calories_burned || 0), 0);
 
   const currentTotals = todayLogs.reduce(
     (acc, log) => ({
@@ -202,7 +204,7 @@ export function Dashboard({ user, profile, logs, activities = [], onDeleteLog, o
       <section className="space-y-8">
         <div className="relative flex flex-col items-center">
           <MacroRing 
-            value={Math.max(0, currentTotals.calories - burnedCalories)} 
+            value={Math.max(0, currentTotals.calories)} 
             max={goals.calories} 
             color="var(--c-accent)" 
             label="Net Calories" 
@@ -213,15 +215,10 @@ export function Dashboard({ user, profile, logs, activities = [], onDeleteLog, o
             <div className="text-[10px] font-display uppercase tracking-widest text-white/40 mb-1">Remaining</div>
             <div className={cn(
               "text-4xl font-display uppercase",
-              (currentTotals.calories - burnedCalories) > goals.calories ? "text-danger" : "text-white"
+              currentTotals.calories > goals.calories ? "text-danger" : "text-white"
             )}>
-              {Math.max(0, goals.calories - (currentTotals.calories - burnedCalories))} <span className="text-sm opacity-40">kcal</span>
+              {Math.max(0, goals.calories - currentTotals.calories)} <span className="text-sm opacity-40">kcal</span>
             </div>
-            {burnedCalories > 0 && (
-              <div className="text-xs text-accent mt-2 font-display uppercase tracking-widest">
-                Burned: {burnedCalories} kcal
-              </div>
-            )}
           </div>
         </div>
         
@@ -287,36 +284,6 @@ export function Dashboard({ user, profile, logs, activities = [], onDeleteLog, o
         </div>
 
       </section>
-
-      {/* Activities Section */}
-      {todayActivities.length > 0 && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-display uppercase tracking-[0.2em] text-white/60">Today's Activities</h2>
-          </div>
-          <div className="space-y-3">
-            {todayActivities.map(activity => (
-              <div key={activity.id} className="vonas-card flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
-                    <Activity className="w-5 h-5 text-accent" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-display uppercase">{activity.activityName}</h4>
-                    <p className="text-[10px] font-display uppercase tracking-widest text-white/40">
-                      {activity.duration_minutes} min • {activity.source}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-display text-accent">-{activity.calories_burned}</div>
-                  <div className="text-[8px] font-display uppercase tracking-widest text-white/40">kcal</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* AI Coach Insight */}
       <section>

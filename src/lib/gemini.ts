@@ -167,56 +167,78 @@ Once the user confirms a choice or describes the meal, set status = "confirmed" 
   }
 }
 
-export async function analyzeActivity(description: string, profile: any, previousContext?: any) {
+export async function chatWithAICoach(message: string, history: any[], profile: any) {
   const ai = getAI();
-  const prompt = `User description: "${description}"\n\nUser Profile: Weight: ${profile?.weight_kg || 'unknown'}kg, Height: ${profile?.height_cm || 'unknown'}cm, Age: ${profile?.age || 'unknown'}, Gender: ${profile?.gender || 'unknown'}\n\nPrevious context: ${previousContext ? JSON.stringify(previousContext) : 'None'}`;
+  const prompt = `User Profile: Weight: ${profile?.weight_kg || 'unknown'}kg, Height: ${profile?.height_cm || 'unknown'}cm, Age: ${profile?.age || 'unknown'}, Gender: ${profile?.gender || 'unknown'}, Goal: ${profile?.goal || 'unknown'}
+
+User Message: "${message}"`;
   
   const modelsToTry = ["gemini-3-flash-preview", "gemini-3.1-flash-lite-preview"];
   let response;
   let lastError;
 
+  // Convert history to Gemini format
+  const formattedHistory = history.map(msg => ({
+    role: msg.role === 'ai' ? 'model' : 'user',
+    parts: [{ text: msg.text }]
+  }));
+
   for (const modelName of modelsToTry) {
     try {
-      response = await ai.models.generateContent({
+      const chat = ai.chats.create({
         model: modelName,
-        contents: { parts: [{ text: prompt }] },
+        history: formattedHistory,
         config: {
-          systemInstruction: `You are an expert fitness AI coach. 
-Your goal is to accurately calculate calories burned based on the user's activity description and their profile (weight, height, age, gender).
-If the user's description lacks crucial information to make a reasonable estimate (e.g., they say "I ran" but don't specify duration or distance), you MUST ask a follow-up question.
-If you have enough information to make a good estimate, calculate the calories burned and return status "success".
+          systemInstruction: `You are an expert fitness and nutrition AI coach. 
+Your goal is to answer questions ONLY related to fitness, health, and nutrition.
+If the user asks about something unrelated, politely decline and steer the conversation back to health and fitness.
+If the user asks about food or what to eat, provide a healthy meal suggestion tailored to their profile and goals.
+If you suggest a specific meal, you MUST include a "suggested_meal" object in your JSON response so the app can log it.
 
 Respond ONLY in JSON format:
 {
-  "status": "success" | "needs_clarification",
-  "activityName": "String (e.g., 'Morning Run', 'Weightlifting')",
-  "duration_minutes": number (if known, else 0),
-  "calories_burned": number (if known, else 0),
-  "question": "String (Ask a follow-up question if status is needs_clarification, else empty string)"
+  "text": "Your conversational response here",
+  "suggested_meal": {
+    "foodName": "Name of the meal",
+    "calories": number,
+    "protein": number,
+    "carbs": number,
+    "fat": number
+  } | null
 }`,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              status: { type: Type.STRING, enum: ["success", "needs_clarification"] },
-              activityName: { type: Type.STRING },
-              duration_minutes: { type: Type.INTEGER },
-              calories_burned: { type: Type.INTEGER },
-              question: { type: Type.STRING }
+              text: { type: Type.STRING },
+              suggested_meal: {
+                type: Type.OBJECT,
+                nullable: true,
+                properties: {
+                  foodName: { type: Type.STRING },
+                  calories: { type: Type.INTEGER },
+                  protein: { type: Type.INTEGER },
+                  carbs: { type: Type.INTEGER },
+                  fat: { type: Type.INTEGER }
+                },
+                required: ["foodName", "calories", "protein", "carbs", "fat"]
+              }
             },
-            required: ["status", "activityName", "duration_minutes", "calories_burned", "question"]
+            required: ["text"]
           }
         }
       });
+
+      response = await chat.sendMessage({ message: prompt });
       break;
     } catch (error) {
       lastError = error;
-      console.warn(`[${modelName}] Failed for analyzeActivity. Trying next...`);
+      console.warn(`[${modelName}] Failed for chatWithAICoach. Trying next...`);
     }
   }
 
   if (!response || !response.text) {
-    throw lastError || new Error("Failed to generate activity analysis");
+    throw lastError || new Error("Failed to generate AI response");
   }
 
   let text = response.text.trim();

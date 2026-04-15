@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { User, Info, LogOut, ChevronRight, Settings, Activity, Palette, Type, Moon, Sun, ChevronLeft, Star } from 'lucide-react';
 import { UserProfile, FoodLog, UserSettings } from '../types';
 import { cn } from '../lib/utils';
@@ -28,6 +28,13 @@ const FONT_FAMILIES: { label: string; value: string }[] = [
 
 export function MenuScreen({ onNavigate, onLogout, onUpdateSettings, userEmail, profile, logs }: MenuProps) {
   const [view, setView] = useState<'main' | 'settings'>('main');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [view]);
 
   const bmi = profile?.weight_kg && profile?.height_cm 
     ? (profile.weight_kg / Math.pow(profile.height_cm / 100, 2)).toFixed(1) 
@@ -52,7 +59,7 @@ export function MenuScreen({ onNavigate, onLogout, onUpdateSettings, userEmail, 
   };
 
   return (
-    <div className="flex-1 overflow-y-auto pb-32 px-6 pt-12 space-y-12 max-w-5xl mx-auto w-full">
+    <div ref={containerRef} className="flex-1 overflow-y-auto pb-32 px-6 pt-12 space-y-12 max-w-5xl mx-auto w-full">
       <AnimatePresence mode="wait">
         {view === 'main' ? (
           <motion.div 
