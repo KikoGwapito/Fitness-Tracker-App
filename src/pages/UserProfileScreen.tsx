@@ -338,51 +338,6 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
                   </button>
                 )}
               </div>
-
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-display uppercase tracking-widest text-white">Connected Apps</h3>
-                  <p className="text-xs text-white/40 mt-1">Sync your activities from other platforms.</p>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#fc4c02]/20 flex items-center justify-center">
-                        <Activity className="w-5 h-5 text-[#fc4c02]" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-display uppercase">Strava</h4>
-                        <p className="text-[10px] font-display uppercase tracking-widest text-white/40">Not connected</p>
-                      </div>
-                    </div>
-                    <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full text-[10px] font-display uppercase tracking-widest transition-colors">
-                      Connect
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl opacity-50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                        <Activity className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-display uppercase">Apple Health</h4>
-                        <p className="text-[10px] font-display uppercase tracking-widest text-white/40">Coming soon</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl opacity-50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                        <Activity className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-display uppercase">Samsung Health</h4>
-                        <p className="text-[10px] font-display uppercase tracking-widest text-white/40">Coming soon</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </div>

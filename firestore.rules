@@ -117,7 +117,7 @@ service cloud.firestore {
              (!('weight_kg' in data) || (data.weight_kg is number && data.weight_kg > 0)) &&
              (!('height_cm' in data) || (data.height_cm is number && data.height_cm > 0)) &&
              (!('activity_level' in data) || (data.activity_level in ['sedentary', 'light', 'moderate', 'active', 'very_active'])) &&
-             (!('goal' in data) || (data.goal in ['lose', 'maintain', 'gain'])) &&
+             (!('goal' in data) || (data.goal in ['lose', 'maintain', 'gain', 'extreme_lose', 'extreme_gain'])) &&
              (!('bmr' in data) || (data.bmr is number && data.bmr > 0)) &&
              (!('settings' in data) || (data.settings is map));
     }
@@ -142,7 +142,9 @@ service cloud.firestore {
              (!('image_url' in data) || (data.image_url is string && data.image_url.size() <= 1048576)) &&
              (!('status' in data) || (data.status in ['confirmed', 'pending', 'error'])) &&
              (!('clarification_required' in data) || (data.clarification_required is string)) &&
-             (!('reason' in data) || (data.reason is string));
+             (!('reason' in data) || (data.reason is string)) &&
+             (!('isPinned' in data) || (data.isPinned is bool)) &&
+             (!('deletedFromLogs' in data) || (data.deletedFromLogs is bool));
     }
 
     function isValidSchedule() {

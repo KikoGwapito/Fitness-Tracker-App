@@ -17,12 +17,6 @@ export interface UserProfile {
   country?: string;
   language?: string;
   birthday?: string;
-  connected_apps?: {
-    strava?: boolean;
-    strava_token?: string;
-    strava_refresh_token?: string;
-    strava_expires_at?: number;
-  };
 }
 
 export interface ActivityLog {
@@ -32,7 +26,7 @@ export interface ActivityLog {
   timestamp: any;
   duration_minutes: number;
   calories_burned: number;
-  source: 'manual' | 'strava' | 'apple_health' | 'samsung_health';
+  source: 'manual';
   external_id?: string;
 }
 
