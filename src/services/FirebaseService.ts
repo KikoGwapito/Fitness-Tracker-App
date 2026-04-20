@@ -27,12 +27,13 @@ class FirebaseService {
    */
   async signInWithGoogle(): Promise<User | null> {
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
       const result = await signInWithPopup(auth, provider);
       return result.user;
     } catch (error) {
       console.error("Error signing in with Google:", error);
-      return null;
+      throw error;
     }
   }
 
@@ -42,13 +43,13 @@ class FirebaseService {
    * 
    * Database Pathing (Firestore): All food data must be saved to a hierarchical path: users/{uid}/food_logs/{logId}.
    */
-  async saveMealToFirebase(uid: string, mealData: any, isValidated: boolean) {
+  async saveMealToFirebase(uid: string, mealData: any, isValidated: boolean, customTimestamp?: Date) {
     const logRef = collection(db, `users/${uid}/food_logs`);
     
     // User Data Schema to use:
     const data: any = {
       userId: uid,
-      timestamp: serverTimestamp(), // Ensure the Timestamp is automatically added to every entry
+      timestamp: customTimestamp || serverTimestamp(), // Ensure the Timestamp is automatically added to every entry
       foodName: mealData.food_name || mealData.foodName || "Logged Meal",
       macros: {
         calories: mealData.calories || 0,

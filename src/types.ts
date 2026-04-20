@@ -17,17 +17,7 @@ export interface UserProfile {
   country?: string;
   language?: string;
   birthday?: string;
-}
-
-export interface ActivityLog {
-  id: string;
-  userId: string;
-  activityName: string;
-  timestamp: any;
-  duration_minutes: number;
-  calories_burned: number;
-  source: 'manual';
-  external_id?: string;
+  tour_completed?: boolean;
 }
 
 export interface DailyGoals {
@@ -69,15 +59,6 @@ export interface FoodLog {
   isValidated?: boolean;
   isPinned?: boolean;
   deletedFromLogs?: boolean;
-}
-
-export interface Todo {
-  id: string;
-  title: string;
-  completed: boolean;
-  createdBy: string;
-  creatorName?: string;
-  createdAt: number;
 }
 
 export interface Schedule {

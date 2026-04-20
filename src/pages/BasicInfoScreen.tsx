@@ -17,9 +17,14 @@ interface BasicInfoScreenProps {
 
 export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(() => {
+    return !profile?.name || !profile?.weight_kg || !profile?.height_cm;
+  });
 
   const [formData, setFormData] = useState({
+    name: profile?.name || '',
+    username: profile?.username || '',
+    birthday: profile?.birthday || '',
     age: profile?.age || 30,
     gender: profile?.gender || 'male',
     weight_kg: profile?.weight_kg || 70,
@@ -31,6 +36,9 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
   useEffect(() => {
     if (profile) {
       setFormData({
+        name: profile.name || '',
+        username: profile.username || '',
+        birthday: profile.birthday || '',
         age: profile.age || 30,
         gender: profile.gender || 'male',
         weight_kg: profile.weight_kg || 70,
@@ -145,6 +153,65 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
       </header>
 
       <div className="vonas-card space-y-12">
+        {/* Profile Information */}
+        <div className="space-y-8">
+          <div className="flex justify-between items-end border-b border-white/10 pb-4">
+            <h3 className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Profile Information</h3>
+          </div>
+          
+          <div className="space-y-2">
+            <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Full Name</label>
+            {isEditing ? (
+              <input 
+                type="text" 
+                value={formData.name}
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g. Jane Doe"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+              />
+            ) : (
+              <div className="text-2xl font-display text-white">
+                {formData.name || <span className="text-white/20 italic text-sm">Not set</span>}
+              </div>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-2 gap-8">
+            <div className="space-y-2">
+              <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Username</label>
+              {isEditing ? (
+                <input 
+                  type="text" 
+                  value={formData.username}
+                  onChange={e => setFormData({ ...formData, username: e.target.value })}
+                  placeholder="@username"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                />
+              ) : (
+                <div className="text-xl font-display text-white">
+                  {formData.username ? `@${formData.username}` : <span className="text-white/20 italic text-sm">Not set</span>}
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Birthday</label>
+              {isEditing ? (
+                <input 
+                  type="date" 
+                  value={formData.birthday}
+                  onChange={e => setFormData({ ...formData, birthday: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                />
+              ) : (
+                <div className="text-xl font-display text-white">
+                  {formData.birthday || <span className="text-white/20 italic text-sm">Not set</span>}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Physical Stats */}
         <div className="space-y-8">
           <div className="flex justify-between items-end border-b border-white/10 pb-4">

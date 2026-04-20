@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera as CameraIcon, Plus, Activity, Flame, Droplets, Beef, X, Loader2, MessageSquare, Image as ImageIcon, LogOut, LogIn, ChevronRight, Sparkles, Apple, Star } from 'lucide-react';
+import { Camera as CameraIcon, Plus, Activity, Flame, Droplets, Beef, X, Loader2, MessageSquare, Image as ImageIcon, LogOut, LogIn, ChevronRight, Sparkles, Apple, Star, Clock } from 'lucide-react';
 import { analyzeMeal } from './lib/gemini';
 import { FoodLog, DailyGoals, UserProfile, UserSettings } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, compressImage } from './lib/utils';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { doc, updateDoc } from 'firebase/firestore';
 import { firebaseService } from './services/FirebaseService';
 import { handleFirestoreError, OperationType } from './lib/error-handler';
 import { BottomNav, TabType } from './components/BottomNav';
@@ -100,6 +101,37 @@ export default function App() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [loggingDate, setLoggingDate] = useState<Date | null>(null);
+  const [showForgotMealPrompt, setShowForgotMealPrompt] = useState(false);
+  const [showTour, setShowTour] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+  const [isMandatorySetup, setIsMandatorySetup] = useState(false);
+
+  // Check for the End of Day forgot meals prompt & Mandatory Setup
+  useEffect(() => {
+    if (isAuthReady && user && profile) {
+      // 1. Setup / Tour Logic
+      if (profile.tour_completed !== true) {
+        setShowTour(true);
+      } else if (!profile.name || !profile.weight_kg || !profile.height_cm || !profile.age || !profile.activity_level) {
+        setIsMandatorySetup(true);
+      } else {
+        setIsMandatorySetup(false);
+      }
+
+      // 2. Forgotten Meals Prompt Logic (only if setup is complete and not on tour)
+      if (profile.tour_completed && profile.weight_kg) {
+        const todayStr = new Date().toDateString();
+        const lastPromptStr = localStorage.getItem(`forgotMealPrompt_${user.uid}`);
+        
+        if (lastPromptStr !== todayStr) {
+          setShowForgotMealPrompt(true);
+          localStorage.setItem(`forgotMealPrompt_${user.uid}`, todayStr);
+        }
+      }
+    }
+  }, [isAuthReady, user, profile]);
+
   // Handle URL shortcut for camera
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -179,9 +211,15 @@ export default function App() {
   }, [user, isAuthReady]);
 
   const handleLogin = async () => {
-    const loggedInUser = await firebaseService.signInWithGoogle();
-    if (loggedInUser) {
-      setUser(loggedInUser);
+    try {
+      const loggedInUser = await firebaseService.signInWithGoogle();
+      if (loggedInUser) {
+        setUser(loggedInUser);
+      }
+    } catch (error: any) {
+      if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/user-cancelled') {
+        console.error('Login failed:', error);
+      }
     }
   };
 
@@ -425,7 +463,7 @@ export default function App() {
             deletedFromLogs: true, // Hide from recent meals
             food_name: textInput || mealData.food_name,
             image_url: finalImageUrl || editingLog.image_url
-          }, result.status === 'confirmed');
+          }, result.status === 'confirmed', loggingDate || undefined);
         } else {
           // editingMode === 'recent'
           if (editingLog.isPinned) {
@@ -440,17 +478,18 @@ export default function App() {
             ...mealData,
             food_name: textInput || mealData.food_name,
             image_url: finalImageUrl || editingLog.image_url
-          }, result.status === 'confirmed');
+          }, result.status === 'confirmed', loggingDate || undefined);
         }
       } else {
         // Create new
         await firebaseService.saveMealToFirebase(user!.uid, {
           ...mealData,
           image_url: finalImageUrl || undefined
-        }, result.status === 'confirmed');
+        }, result.status === 'confirmed', loggingDate || undefined);
       }
 
       setIsLogging(false);
+      setLoggingDate(null);
       setEditingLog(null);
       setEditingMode(null);
       setPendingAnalysis(null);
@@ -563,6 +602,124 @@ export default function App() {
       {/* Main container */}
       <div className="w-full h-[100dvh] flex flex-col md:flex-row relative bg-bg overflow-hidden">
         
+        {/* Overlays / Modals */}
+        <AnimatePresence>
+          {showTour && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 bg-bg/95 flex flex-col items-center justify-center p-6 text-center"
+            >
+              <Sparkles className="w-12 h-12 text-accent mb-6" />
+              <h1 className="text-4xl font-display uppercase tracking-widest text-white mb-2">Welcome to G-Refine</h1>
+              <p className="text-sm font-display uppercase tracking-widest text-white/40 max-w-sm mb-8 leading-relaxed">
+                Take a quick tour of your new AI-powered nutrition coach.
+              </p>
+              
+              <div className="vonas-card bg-white/5 space-y-6 text-left max-w-md w-full mb-8">
+                <div className="flex items-start gap-4">
+                  <CameraIcon className="w-6 h-6 text-accent shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-display uppercase tracking-widest text-white">1. Snap & Log</h3>
+                    <p className="text-xs text-white/40 mt-1">Take a photo of your meal. Our AI will automatically identify it, estimate macros, and secure your logs.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <Activity className="w-6 h-6 text-amber-500 shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-display uppercase tracking-widest text-white">2. Track Progress</h3>
+                    <p className="text-xs text-white/40 mt-1">Monitor your daily calories, protein, and health score in real-time. Stay within your limits.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <MessageSquare className="w-6 h-6 text-blue-400 shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-display uppercase tracking-widest text-white">3. Get Coached</h3>
+                    <p className="text-xs text-white/40 mt-1">Use the AI Coach to ask nutrition questions, get personalized advice, or clarify meal entries.</p>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={async () => {
+                  setShowTour(false);
+                  const userRef = doc(db, 'users', user.uid);
+                  await updateDoc(userRef, { tour_completed: true });
+                }}
+                className="vonas-button vonas-button-primary w-full max-w-md py-4"
+              >
+                Let's Get Started
+              </button>
+            </motion.div>
+          )}
+
+          {!showTour && isMandatorySetup && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 bg-bg overflow-y-auto"
+            >
+              <div className="max-w-xl mx-auto w-full p-6 pt-12 space-y-8">
+                <div className="text-center">
+                  <h1 className="text-3xl font-display uppercase tracking-widest text-white mb-2">Complete Your Profile</h1>
+                  <p className="text-xs font-display uppercase tracking-widest text-white/40">
+                    Before we begin, we need some essential health info to set your daily goals accurately.
+                  </p>
+                </div>
+                {/* Reuse BasicInfoScreen logic but force them to save */}
+                <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 relative">
+                  <BasicInfoScreen 
+                    user={user} 
+                    profile={profile} 
+                    onBack={() => {}} 
+                  />
+                  {/* Block the back button visually */}
+                  <div className="absolute top-4 left-4 right-4 h-12 bg-bg/50 backdrop-blur z-10 flex items-center justify-center border border-accent/20 rounded-xl">
+                    <span className="text-[10px] font-display uppercase tracking-widest text-accent">Required Information</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {!showTour && !isMandatorySetup && showForgotMealPrompt && (
+            <div className="absolute inset-0 z-50 bg-bg/80 backdrop-blur-sm flex items-center justify-center p-6">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                className="vonas-card max-w-sm w-full space-y-6 relative border-accent/30 bg-[#151515]"
+              >
+                <button onClick={() => setShowForgotMealPrompt(false)} className="absolute top-4 right-4 text-white/40 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+                <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center border border-accent/30">
+                  <Clock className="w-6 h-6 text-accent" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-display uppercase tracking-widest text-white mb-2">Forgot any meals?</h2>
+                  <p className="text-sm font-display uppercase tracking-widest text-white/40 leading-relaxed">
+                    Looks like a new day. Did you forget to log any meals yesterday or earlier? Keep your history accurate.
+                  </p>
+                </div>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setShowForgotMealPrompt(false)}
+                    className="flex-1 py-4 text-[10px] font-display uppercase tracking-widest text-white/40 hover:text-white transition-colors"
+                  >
+                    Nope, all good
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setShowForgotMealPrompt(false);
+                      handleTabChange('history');
+                    }}
+                    className="flex-[2] vonas-button vonas-button-primary py-4 text-xs"
+                  >
+                    Yes, take me to History
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
         <BottomNav 
           activeTab={activeTab} 
           onChange={handleTabChange} 
@@ -615,6 +772,13 @@ export default function App() {
                   if (user) {
                     firebaseService.saveSchedule(user.uid, date, text);
                   }
+                }}
+                onLogForDate={(date) => {
+                  // Set time to noon for the specific date
+                  const d = new Date(date);
+                  d.setHours(12, 0, 0, 0);
+                  setLoggingDate(d);
+                  setIsLogging(true);
                 }}
               />
             )}
@@ -721,6 +885,7 @@ export default function App() {
                 <button 
                   onClick={() => {
                     setIsLogging(false);
+                    setLoggingDate(null);
                     setEditingLog(null);
                     setEditingMode(null);
                   }}
@@ -917,6 +1082,7 @@ export default function App() {
                         <button 
                           onClick={() => {
                             setIsLogging(false);
+                            setLoggingDate(null);
                             setActiveTab('menu');
                             setSubPage('favorites');
                           }}

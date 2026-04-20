@@ -1,8 +1,8 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.vonas.app',
-  appName: 'Vonas',
+  appId: 'com.grefine.app',
+  appName: 'G-Refine',
   webDir: 'dist',
   bundledWebRuntime: false,
   plugins: {

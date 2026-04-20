@@ -1,6 +1,6 @@
 {
-  "name": "Vonas",
-  "short_name": "Vonas",
+  "name": "G-Refine",
+  "short_name": "G-Refine",
   "description": "AI-powered meal tracking and nutrition coaching",
   "start_url": "/",
   "display": "standalone",

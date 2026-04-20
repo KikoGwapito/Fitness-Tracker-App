@@ -156,18 +156,6 @@ service cloud.firestore {
              data.createdAt is number;
     }
 
-    function isValidActivity() {
-      let data = request.resource.data;
-      return hasRequiredFields(['userId', 'timestamp', 'activityName', 'duration_minutes', 'calories_burned', 'source']) &&
-             data.userId == request.auth.uid &&
-             data.timestamp is timestamp &&
-             data.activityName is string && data.activityName.size() > 0 && data.activityName.size() <= 200 &&
-             data.duration_minutes is number && data.duration_minutes >= 0 &&
-             data.calories_burned is number && data.calories_burned >= 0 &&
-             data.source is string && data.source in ['manual', 'strava', 'apple_health', 'samsung_health'] &&
-             (!('external_id' in data) || data.external_id == null || (data.external_id is string && data.external_id.size() <= 200));
-    }
-
     // ===============================================================
     // Rules
     // ===============================================================
@@ -191,14 +179,6 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId) && isValidSchedule();
         allow update: if isOwner(userId) && isValidSchedule() && 
-                      request.resource.data.userId == resource.data.userId;
-        allow delete: if isOwner(userId);
-      }
-
-      match /activities/{activityId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidActivity();
-        allow update: if isOwner(userId) && isValidActivity() && 
                       request.resource.data.userId == resource.data.userId;
         allow delete: if isOwner(userId);
       }

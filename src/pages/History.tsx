@@ -17,9 +17,10 @@ interface HistoryProps {
   onToggleFavorite: (logId: string, currentPinnedStatus: boolean) => void;
   schedules?: Record<string, string>;
   onSaveSchedule?: (date: string, text: string) => void;
+  onLogForDate?: (date: Date) => void;
 }
 
-export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorite, schedules = {}, onSaveSchedule }: HistoryProps) {
+export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorite, schedules = {}, onSaveSchedule, onLogForDate }: HistoryProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isMealsOpen, setIsMealsOpen] = useState(false);
@@ -384,10 +385,19 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
               >
                 {selectedLogs.length === 0 ? (
                   <div className="text-center py-12 vonas-card border-dashed">
-                    <p className="text-white/20 text-[10px] font-display uppercase tracking-widest">No meals logged</p>
+                    <p className="text-white/20 text-[10px] font-display uppercase tracking-widest mb-4">No meals logged</p>
+                    {selectedDate < new Date(new Date().setHours(0, 0, 0, 0)) && onLogForDate && (
+                      <button 
+                        onClick={() => onLogForDate(selectedDate)}
+                        className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-display uppercase tracking-widest transition-colors"
+                      >
+                        Add Forgotten Meal
+                      </button>
+                    )}
                   </div>
                 ) : (
-                  selectedLogs.map(log => (
+                  <>
+                    {selectedLogs.map(log => (
                     <div 
                       key={log.id} 
                       className="vonas-card group cursor-pointer"
@@ -447,7 +457,16 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
                         </motion.button>
                       </div>
                     </div>
-                  ))
+                  ))}
+                  {selectedDate < new Date(new Date().setHours(0, 0, 0, 0)) && onLogForDate && selectedLogs.length > 0 && (
+                    <button 
+                      onClick={() => onLogForDate(selectedDate)}
+                      className="w-full mt-4 py-4 border border-dashed border-white/20 hover:border-white/40 hover:bg-white/5 rounded-2xl text-xs font-display uppercase tracking-widest text-white/60 transition-colors flex items-center justify-center gap-2"
+                    >
+                       <Plus className="w-4 h-4" /> Add Forgotten Meal
+                    </button>
+                  )}
+                 </>
                 )}
               </motion.div>
             )}
