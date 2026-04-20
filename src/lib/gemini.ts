@@ -1,12 +1,12 @@
-import { GoogleGenAI, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
+import { GoogleGenAI, Type, HarmCategory, HarmBlockThreshold, ThinkingLevel } from "@google/genai";
 
 let aiInstance: GoogleGenAI | null = null;
 
 function getAI() {
   if (!aiInstance) {
-    const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is missing. Please set it in your environment variables (or VITE_GEMINI_API_KEY if deploying to Vercel).");
+      throw new Error("GEMINI_API_KEY is missing. Please set it in your environment variables.");
     }
     aiInstance = new GoogleGenAI({ apiKey });
   }
@@ -25,7 +25,8 @@ export async function analyzeMeal(imagePart?: { inlineData: { data: string; mime
 
   let response;
   let lastError;
-  const modelsToTry = ["gemini-3-flash-preview", "gemini-3.1-flash-lite-preview"];
+  // Use flash-lite-preview as primary since it is the fastest for vision/text tasks
+  const modelsToTry = ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"];
 
   for (const modelName of modelsToTry) {
     let attempt = 0;
@@ -38,6 +39,8 @@ export async function analyzeMeal(imagePart?: { inlineData: { data: string; mime
           model: modelName,
           contents: { parts },
           config: {
+            // Minimize latency by using lower thinking level
+            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
             systemInstruction: `## ROLE
 Elite Performance Nutritionist for Gwapitometrics. High-precision macro tracking for athletes.
 
@@ -131,8 +134,8 @@ Once the user confirms a choice or describes the meal, set status = "confirmed" 
         // Check if it's a 503 or 429 (quota/demand) error
         if ((errorMessage.includes('503') || errorMessage.includes('429') || errorMessage.includes('high demand') || errorMessage.includes('UNAVAILABLE')) && attempt < MAX_RETRIES) {
           console.warn(`[${modelName}] API high demand. Retrying attempt ${attempt} of ${MAX_RETRIES}...`);
-          // Exponential backoff: 1.5s
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1500));
+          // Exponential backoff: 1s (reduced from 1.5s)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
         } else {
           // If it's not a retryable error or we're out of retries, break inner loop to try next model
           console.warn(`[${modelName}] Failed. Moving to next model if available.`);
@@ -173,7 +176,7 @@ export async function chatWithAICoach(message: string, history: any[], profile: 
 
 User Message: "${message}"`;
   
-  const modelsToTry = ["gemini-3-flash-preview", "gemini-3.1-flash-lite-preview"];
+  const modelsToTry = ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"];
   let response;
   let lastError;
 
@@ -189,6 +192,7 @@ User Message: "${message}"`;
         model: modelName,
         history: formattedHistory,
         config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           systemInstruction: `You are an expert fitness and nutrition AI coach. 
 Your goal is to answer questions ONLY related to fitness, health, and nutrition.
 If the user asks about something unrelated, politely decline and steer the conversation back to health and fitness.
