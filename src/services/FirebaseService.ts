@@ -2,7 +2,19 @@ import { auth, db } from '../firebase';
 import { 
   GoogleAuthProvider, 
   signInWithPopup, 
-  User 
+  User,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  PhoneAuthProvider,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  deleteUser,
+  reauthenticateWithPopup,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  fetchSignInMethodsForEmail
 } from 'firebase/auth';
 import { 
   collection, 
@@ -21,6 +33,77 @@ import { FoodLog, UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
 
 class FirebaseService {
+  setupRecaptcha(containerId: string) {
+    if (!(window as any).recaptchaVerifier) {
+      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+        size: 'invisible',
+      });
+    }
+    return (window as any).recaptchaVerifier;
+  }
+
+  async sendPhoneOTP(phoneNumber: string, appVerifier: any) {
+    return await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+  }
+
+  async signInWithEmail(email: string, pass: string): Promise<User | null> {
+    const creds = await signInWithEmailAndPassword(auth, email, pass);
+    return creds.user;
+  }
+
+  async signUpWithEmail(email: string, pass: string): Promise<User | null> {
+    const creds = await createUserWithEmailAndPassword(auth, email, pass);
+    if (creds.user) {
+      await sendEmailVerification(creds.user);
+    }
+    return creds.user;
+  }
+
+  async checkEmailExists(email: string): Promise<boolean> {
+    try {
+      const methods = await fetchSignInMethodsForEmail(auth, email);
+      return methods.length > 0;
+    } catch (error) {
+      console.warn("Could not fetch sign in methods. Ensure email enumeration protection is disabled if this fails.", error);
+      // Fallback: If it throws because of enumeration protection, we can't reliably check here, but we'll re-throw for the component.
+      throw error;
+    }
+  }
+
+  async sendPasswordReset(email: string): Promise<void> {
+    await sendPasswordResetEmail(auth, email);
+  }
+
+  async resendVerificationEmail(user: User): Promise<void> {
+    await sendEmailVerification(user);
+  }
+
+  async reauthenticateAndVerify(user: User, passOrCode: string, method: 'email' | 'phone') {
+    if (method === 'email') {
+      if (!user.email) throw new Error("No email linked to this account");
+      const cred = EmailAuthProvider.credential(user.email, passOrCode);
+      await reauthenticateWithCredential(user, cred);
+    } else if (method === 'phone') {
+      // For phone, the passOrCode needs to be handled via the confirmation result from OTP.
+      // We will handle phone OTP re-auth directly in the component.
+      throw new Error("Phone re-auth should be handled via confirmation result");
+    }
+  }
+
+  async deleteAccountAndData(user: User) {
+    // Note: Due to security rules, users can delete their own documents.
+    // Realistically a Cloud Function should clean up all nested collections, 
+    // but we'll try to delete what we can here.
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await deleteDoc(userRef);
+      await deleteUser(user);
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  }
+
   /**
    * Authentication Logic: Implement a signInWithGoogle() function using firebase_auth.
    * Ensure the User object is captured to retrieve the unique uid.
@@ -31,8 +114,10 @@ class FirebaseService {
     try {
       const result = await signInWithPopup(auth, provider);
       return result.user;
-    } catch (error) {
-      console.error("Error signing in with Google:", error);
+    } catch (error: any) {
+      if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+        console.error("Error signing in with Google:", error);
+      }
       throw error;
     }
   }

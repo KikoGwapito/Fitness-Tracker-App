@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.grefine.app',
   appName: 'G-Refine',
   webDir: 'dist',
-  bundledWebRuntime: false,
   plugins: {
     LocalNotifications: {
       smallIcon: "ic_stat_icon_config_sample",

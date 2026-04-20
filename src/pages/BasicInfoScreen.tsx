@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, DailyGoals } from '../types';
-import { User } from 'firebase/auth';
+import { User, updatePassword } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
-import { Loader2, Save, ChevronLeft } from 'lucide-react';
+import { Loader2, Save, ChevronLeft, Lock } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 import { COUNTRIES } from '../lib/countries';
@@ -17,8 +17,13 @@ interface BasicInfoScreenProps {
 
 export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [errorInfo, setErrorInfo] = useState('');
+  
+  const hasPasswordProvider = user.providerData.some(p => p.providerId === 'password');
+  const [newPassword, setNewPassword] = useState('');
+
   const [isEditing, setIsEditing] = useState(() => {
-    return !profile?.name || !profile?.weight_kg || !profile?.height_cm;
+    return !profile?.name || !profile?.weight_kg || !profile?.height_cm || !profile?.username || (!hasPasswordProvider);
   });
 
   const [formData, setFormData] = useState({
@@ -49,6 +54,21 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
     }
   }, [profile]);
 
+  useEffect(() => {
+    if (formData.birthday) {
+      const birthDate = new Date(formData.birthday);
+      const today = new Date();
+      let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        calculatedAge--;
+      }
+      if (calculatedAge !== formData.age) {
+        setFormData(prev => ({ ...prev, age: calculatedAge > 0 ? calculatedAge : 0 }));
+      }
+    }
+  }, [formData.birthday]);
+
   const calculateMacros = (): DailyGoals & { bmr: number } => {
     const { age, gender, weight_kg, height_cm, activity_level, goal } = formData;
     
@@ -72,6 +92,9 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
     if (goal === 'gain') tdee += 500;
     if (goal === 'extreme_gain') tdee += 1000;
 
+    // Safety limit: Don't let calories go below 1200 for adults
+    if (tdee < 1200) tdee = 1200;
+
     const calories = Math.round(tdee);
     
     // Macros: Protein 2g/kg, Fat 0.8g/kg, Carbs remainder
@@ -80,6 +103,8 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
     
     const proteinCals = protein_g * 4;
     const fatCals = fat_g * 9;
+    
+    // If calories are extremely low, prioritize protein/fat and prevent negative carbs
     const carbs_g = Math.round(Math.max(0, (calories - proteinCals - fatCals) / 4));
     const sugar_g = Math.round(calories * 0.1 / 4); // 10% of calories from sugar
     const sodium_mg = 2300; // Standard daily limit
@@ -89,26 +114,52 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
 
   const handleSave = async () => {
     setIsSaving(true);
+    setErrorInfo('');
     try {
+      if (!formData.birthday) throw new Error("Birthday is required.");
+      if (!formData.weight_kg || formData.weight_kg <= 0) throw new Error("A valid specific weight is required.");
+      if (!formData.height_cm || formData.height_cm <= 0) throw new Error("A valid height is required.");
+      
+      if (!hasPasswordProvider && isEditing) {
+        if (!newPassword || newPassword.length < 6) {
+          throw new Error("A strong password (at least 6 characters) is required.");
+        }
+        await updatePassword(user, newPassword);
+      }
+
       const calculated = calculateMacros();
       const userRef = doc(db, 'users', user.uid);
       
-      await updateDoc(userRef, {
-        ...formData,
-        daily_goals: {
-          calories: calculated.calories,
-          protein_g: calculated.protein_g,
-          carbs_g: calculated.carbs_g,
-          fat_g: calculated.fat_g,
-          sugar_g: calculated.sugar_g,
-          sodium_mg: calculated.sodium_mg,
-        },
-        bmr: calculated.bmr,
-      });
+      try {
+        await updateDoc(userRef, {
+          ...formData,
+          daily_goals: {
+            calories: calculated.calories,
+            protein_g: calculated.protein_g,
+            carbs_g: calculated.carbs_g,
+            fat_g: calculated.fat_g,
+            sugar_g: calculated.sugar_g,
+            sodium_mg: calculated.sodium_mg,
+          },
+          bmr: calculated.bmr,
+        });
+      } catch (firestoreErr: any) {
+        handleFirestoreError(firestoreErr, OperationType.UPDATE, `users/${user.uid}`);
+      }
       
       setIsEditing(false);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+    } catch (error: any) {
+      console.error(error);
+      let displayMsg = error.message;
+      if (displayMsg.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(displayMsg);
+          displayMsg = parsed.error;
+        } catch (e) {
+            // keep original
+        }
+      }
+      setErrorInfo(displayMsg || 'Failed to update profile.');
     } finally {
       setIsSaving(false);
     }
@@ -153,6 +204,12 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
       </header>
 
       <div className="vonas-card space-y-12">
+        {errorInfo && (
+          <div className="bg-danger/10 text-danger text-xs p-4 rounded-xl border border-danger/20">
+            {errorInfo}
+          </div>
+        )}
+        
         {/* Profile Information */}
         <div className="space-y-8">
           <div className="flex justify-between items-end border-b border-white/10 pb-4">
@@ -193,7 +250,7 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
                 </div>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Birthday</label>
               {isEditing ? (
@@ -210,6 +267,23 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
               )}
             </div>
           </div>
+          
+          {isEditing && !hasPasswordProvider && (
+            <div className="space-y-2 pt-4 border-t border-white/5">
+              <label className="text-[10px] font-display uppercase tracking-[0.2em] text-accent">Finish Account Setup: Set a Password</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                <input 
+                  type="password" 
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="Create a strong password (6+ chars)"
+                  className="w-full bg-black/30 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-white text-sm focus:border-accent/50 focus:outline-none transition-colors"
+                />
+              </div>
+              <p className="text-[10px] text-white/40 ml-2 mt-2">You signed in with Google. Let's create a password so you can sign in directly.</p>
+            </div>
+          )}
         </div>
 
         {/* Physical Stats */}
@@ -230,17 +304,11 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
           <div className="grid grid-cols-2 gap-8">
             <div className="space-y-2">
               <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Age</label>
-              {isEditing ? (
-                <input 
-                  type="number" 
-                  value={formData.age}
-                  onChange={e => setFormData({ ...formData, age: Number(e.target.value) })}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
-                />
-              ) : (
-                <div className="text-2xl font-display text-white">
-                  {formData.age} <span className="text-xs text-white/20 font-sans tracking-normal lowercase">yrs</span>
-                </div>
+              <div className="text-2xl font-display text-white">
+                {formData.age > 0 ? formData.age : '--'} <span className="text-xs text-white/20 font-sans tracking-normal lowercase">yrs</span>
+              </div>
+              {isEditing && (
+                <p className="text-[10px] text-white/20 mt-1">Calculated from birthday</p>
               )}
             </div>
             <div className="space-y-2">
@@ -270,7 +338,7 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
                   type="number" 
                   value={formData.weight_kg}
                   onChange={e => setFormData({ ...formData, weight_kg: Number(e.target.value) })}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
                 />
               ) : (
                 <div className="text-2xl font-display text-white">
@@ -285,7 +353,7 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
                   type="number" 
                   value={formData.height_cm}
                   onChange={e => setFormData({ ...formData, height_cm: Number(e.target.value) })}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
                 />
               ) : (
                 <div className="text-2xl font-display text-white">

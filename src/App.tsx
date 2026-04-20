@@ -15,7 +15,10 @@ import { History } from './pages/History';
 import { Progress } from './pages/Progress';
 import { UserProfileScreen } from './pages/UserProfileScreen';
 import { BasicInfoScreen } from './pages/BasicInfoScreen';
+import { AuthScreen } from './components/AuthScreen';
+import { AccountSettingsScreen } from './pages/AccountSettingsScreen';
 import { MenuScreen } from './pages/Menu';
+import { VerifyEmailScreen } from './pages/VerifyEmailScreen';
 import { AppInfo } from './pages/AppInfo';
 import { FavoritesScreen } from './pages/Favorites';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -38,7 +41,7 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
-  const [subPage, setSubPage] = useState<'none' | 'profile' | 'basic-info' | 'app-info' | 'favorites'>('none');
+  const [subPage, setSubPage] = useState<'none' | 'profile' | 'basic-info' | 'app-info' | 'favorites' | 'account-settings'>('none');
   const [logs, setLogs] = useState<FoodLog[]>([]);
   const [schedules, setSchedules] = useState<Record<string, string>>({});
 
@@ -113,7 +116,12 @@ export default function App() {
       // 1. Setup / Tour Logic
       if (profile.tour_completed !== true) {
         setShowTour(true);
-      } else if (!profile.name || !profile.weight_kg || !profile.height_cm || !profile.age || !profile.activity_level) {
+      } else if (
+        !profile.weight_kg || 
+        !profile.height_cm || 
+        !profile.age || 
+        !profile.activity_level
+      ) {
         setIsMandatorySetup(true);
       } else {
         setIsMandatorySetup(false);
@@ -210,15 +218,24 @@ export default function App() {
     };
   }, [user, isAuthReady]);
 
+  const [googleLoginError, setGoogleLoginError] = useState('');
+
   const handleLogin = async () => {
     try {
       const loggedInUser = await firebaseService.signInWithGoogle();
       if (loggedInUser) {
         setUser(loggedInUser);
+        setGoogleLoginError('');
       }
     } catch (error: any) {
       if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/user-cancelled') {
         console.error('Login failed:', error);
+        let msg = error.message || 'Google Login failed';
+        const errorCode = error.code || (error.cause?.code);
+        if (errorCode === 'auth/too-many-requests') {
+          msg = 'Too many attempts. For security, please try again later.';
+        }
+        setGoogleLoginError(msg);
       }
     }
   };
@@ -571,30 +588,12 @@ export default function App() {
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-bg flex flex-col items-center justify-center p-6 text-center overflow-hidden">
-        <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="w-24 h-24 bg-accent/10 rounded-full flex items-center justify-center mb-8 border border-accent/20"
-        >
-          <Activity className="w-12 h-12 text-accent" />
-        </motion.div>
-        <h1 className="text-6xl md:text-8xl font-display uppercase leading-none mb-4 animate-slam">
-          G-<span className="text-stroke">Refine</span>
-        </h1>
-        <p className="text-ink/60 mb-12 max-w-sm font-light tracking-wide uppercase text-xs">
-          Refining oneself through better food choices.
-        </p>
-        <button
-          onClick={handleLogin}
-          className="vonas-button vonas-button-primary"
-        >
-          <LogIn className="w-5 h-5" />
-          Continue with Google
-        </button>
-      </div>
-    );
+    return <AuthScreen onGoogleLogin={handleLogin} onLoginSuccess={() => {}} externalError={googleLoginError} />;
+  }
+
+  // Prevent access if email not verified and they use email/password auth
+  if (!user.emailVerified && user.providerData.some(p => p.providerId === 'password')) {
+    return <VerifyEmailScreen user={user} />;
   }
 
   return (
@@ -792,6 +791,13 @@ export default function App() {
                 onNavigate={setSubPage} 
                 onLogout={handleLogout} 
                 onUpdateSettings={handleUpdateSettings}
+              />
+            )}
+            {activeTab === 'menu' && subPage === 'account-settings' && (
+              <AccountSettingsScreen 
+                user={user} 
+                profile={profile} 
+                onBack={() => setSubPage('none')} 
               />
             )}
             {activeTab === 'menu' && subPage === 'profile' && (
