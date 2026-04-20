@@ -33,61 +33,20 @@ import { FoodLog, UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
 
 class FirebaseService {
-  setupRecaptcha(containerId: string) {
-    if (!(window as any).recaptchaVerifier) {
-      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-        size: 'invisible',
+  setupDeleteRecaptcha(containerId: string, onVerified: () => void) {
+    if (!(window as any).deleteRecaptchaVerifier) {
+      (window as any).deleteRecaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+        size: 'normal',
+        callback: () => {
+          onVerified();
+        },
+        'expired-callback': () => {
+          // Response expired, reset state if needed
+        }
       });
+      (window as any).deleteRecaptchaVerifier.render();
     }
-    return (window as any).recaptchaVerifier;
-  }
-
-  async sendPhoneOTP(phoneNumber: string, appVerifier: any) {
-    return await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
-  }
-
-  async signInWithEmail(email: string, pass: string): Promise<User | null> {
-    const creds = await signInWithEmailAndPassword(auth, email, pass);
-    return creds.user;
-  }
-
-  async signUpWithEmail(email: string, pass: string): Promise<User | null> {
-    const creds = await createUserWithEmailAndPassword(auth, email, pass);
-    if (creds.user) {
-      await sendEmailVerification(creds.user);
-    }
-    return creds.user;
-  }
-
-  async checkEmailExists(email: string): Promise<boolean> {
-    try {
-      const methods = await fetchSignInMethodsForEmail(auth, email);
-      return methods.length > 0;
-    } catch (error) {
-      console.warn("Could not fetch sign in methods. Ensure email enumeration protection is disabled if this fails.", error);
-      // Fallback: If it throws because of enumeration protection, we can't reliably check here, but we'll re-throw for the component.
-      throw error;
-    }
-  }
-
-  async sendPasswordReset(email: string): Promise<void> {
-    await sendPasswordResetEmail(auth, email);
-  }
-
-  async resendVerificationEmail(user: User): Promise<void> {
-    await sendEmailVerification(user);
-  }
-
-  async reauthenticateAndVerify(user: User, passOrCode: string, method: 'email' | 'phone') {
-    if (method === 'email') {
-      if (!user.email) throw new Error("No email linked to this account");
-      const cred = EmailAuthProvider.credential(user.email, passOrCode);
-      await reauthenticateWithCredential(user, cred);
-    } else if (method === 'phone') {
-      // For phone, the passOrCode needs to be handled via the confirmation result from OTP.
-      // We will handle phone OTP re-auth directly in the component.
-      throw new Error("Phone re-auth should be handled via confirmation result");
-    }
+    return (window as any).deleteRecaptchaVerifier;
   }
 
   async deleteAccountAndData(user: User) {

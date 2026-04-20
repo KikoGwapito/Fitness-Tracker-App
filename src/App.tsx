@@ -18,7 +18,6 @@ import { BasicInfoScreen } from './pages/BasicInfoScreen';
 import { AuthScreen } from './components/AuthScreen';
 import { AccountSettingsScreen } from './pages/AccountSettingsScreen';
 import { MenuScreen } from './pages/Menu';
-import { VerifyEmailScreen } from './pages/VerifyEmailScreen';
 import { AppInfo } from './pages/AppInfo';
 import { FavoritesScreen } from './pages/Favorites';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -219,8 +218,11 @@ export default function App() {
   }, [user, isAuthReady]);
 
   const [googleLoginError, setGoogleLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const handleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
     try {
       const loggedInUser = await firebaseService.signInWithGoogle();
       if (loggedInUser) {
@@ -228,7 +230,11 @@ export default function App() {
         setGoogleLoginError('');
       }
     } catch (error: any) {
-      if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/user-cancelled') {
+      if (
+        error.code !== 'auth/popup-closed-by-user' && 
+        error.code !== 'auth/cancelled-popup-request' &&
+        error.code !== 'auth/user-cancelled'
+      ) {
         console.error('Login failed:', error);
         let msg = error.message || 'Google Login failed';
         const errorCode = error.code || (error.cause?.code);
@@ -237,6 +243,8 @@ export default function App() {
         }
         setGoogleLoginError(msg);
       }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -588,12 +596,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <AuthScreen onGoogleLogin={handleLogin} onLoginSuccess={() => {}} externalError={googleLoginError} />;
-  }
-
-  // Prevent access if email not verified and they use email/password auth
-  if (!user.emailVerified && user.providerData.some(p => p.providerId === 'password')) {
-    return <VerifyEmailScreen user={user} />;
+    return <AuthScreen onGoogleLogin={handleLogin} onLoginSuccess={() => {}} externalError={googleLoginError} isLoading={isLoggingIn} />;
   }
 
   return (

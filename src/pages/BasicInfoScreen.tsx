@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, DailyGoals } from '../types';
-import { User, updatePassword } from 'firebase/auth';
+import { User } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
-import { Loader2, Save, ChevronLeft, Lock } from 'lucide-react';
+import { Loader2, Save, ChevronLeft } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { motion } from 'motion/react';
-import { COUNTRIES } from '../lib/countries';
 
 interface BasicInfoScreenProps {
   user: User;
@@ -18,12 +16,9 @@ interface BasicInfoScreenProps {
 export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [errorInfo, setErrorInfo] = useState('');
-  
-  const hasPasswordProvider = user.providerData.some(p => p.providerId === 'password');
-  const [newPassword, setNewPassword] = useState('');
 
   const [isEditing, setIsEditing] = useState(() => {
-    return !profile?.name || !profile?.weight_kg || !profile?.height_cm || !profile?.username || (!hasPasswordProvider);
+    return !profile?.weight_kg || !profile?.height_cm;
   });
 
   const [formData, setFormData] = useState({
@@ -120,13 +115,6 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
       if (!formData.weight_kg || formData.weight_kg <= 0) throw new Error("A valid specific weight is required.");
       if (!formData.height_cm || formData.height_cm <= 0) throw new Error("A valid height is required.");
       
-      if (!hasPasswordProvider && isEditing) {
-        if (!newPassword || newPassword.length < 6) {
-          throw new Error("A strong password (at least 6 characters) is required.");
-        }
-        await updatePassword(user, newPassword);
-      }
-
       const calculated = calculateMacros();
       const userRef = doc(db, 'users', user.uid);
       
@@ -267,23 +255,6 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
               )}
             </div>
           </div>
-          
-          {isEditing && !hasPasswordProvider && (
-            <div className="space-y-2 pt-4 border-t border-white/5">
-              <label className="text-[10px] font-display uppercase tracking-[0.2em] text-accent">Finish Account Setup: Set a Password</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                <input 
-                  type="password" 
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  placeholder="Create a strong password (6+ chars)"
-                  className="w-full bg-black/30 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-white text-sm focus:border-accent/50 focus:outline-none transition-colors"
-                />
-              </div>
-              <p className="text-[10px] text-white/40 ml-2 mt-2">You signed in with Google. Let's create a password so you can sign in directly.</p>
-            </div>
-          )}
         </div>
 
         {/* Physical Stats */}

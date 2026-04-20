@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { User } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
+import { User, GoogleAuthProvider, reauthenticateWithPopup } from 'firebase/auth';
 import { UserProfile } from '../types';
-import { ChevronLeft, Save, Loader2, Lock, User as UserIcon, Trash2, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Save, Loader2, User as UserIcon, Trash2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { firebaseService } from '../services/FirebaseService';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { db, auth } from '../firebase';
 
 interface AccountSettingsScreenProps {
   user: User;
@@ -16,46 +15,55 @@ interface AccountSettingsScreenProps {
 
 export function AccountSettingsScreen({ user, profile, onBack }: AccountSettingsScreenProps) {
   const [username, setUsername] = useState(profile?.username || '');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [captchaResolved, setCaptchaResolved] = useState(false);
 
-  const hasPasswordProvider = user.providerData.some(p => p.providerId === 'password');
+  useEffect(() => {
+    if (showDeleteModal) {
+      setCaptchaResolved(false);
+      try {
+        firebaseService.setupDeleteRecaptcha('delete-captcha-container', () => {
+          setCaptchaResolved(true);
+        });
+      } catch (e) {
+        console.error("Recaptcha setup error:", e);
+      }
+    }
+  }, [showDeleteModal]);
 
   const handleDeleteAccount = async () => {
     setDeleteError('');
     setIsDeleting(true);
     try {
-      if (hasPasswordProvider) {
-        await firebaseService.reauthenticateAndVerify(user, deleteConfirmation, 'email');
+      if (!captchaResolved) {
+        throw new Error('Please complete the captcha to verify you are human.');
       }
-      await firebaseService.deleteAccountAndData(user);
+      
+      try {
+        await firebaseService.deleteAccountAndData(user);
+      } catch (e: any) {
+        // If Google requires a recent login to delete the account
+        if (e.code === 'auth/requires-recent-login' || e.message?.includes('requires-recent-login')) {
+          const provider = new GoogleAuthProvider();
+          await reauthenticateWithPopup(auth.currentUser!, provider);
+          // Try deleting again
+          await firebaseService.deleteAccountAndData(user);
+        } else {
+          throw e; // rethrow if it's a different error
+        }
+      }
     } catch (e: any) {
       console.error(e);
-      setDeleteError(e.message || "Failed to delete account. You may need to log out and log back in.");
+      setDeleteError(e.message || "Failed to delete account. Please try logging out and logging back in.");
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  const [resetSent, setResetSent] = useState(false);
-
-  const handleSendResetLink = async () => {
-    if (!user.email) return;
-    try {
-      await firebaseService.sendPasswordReset(user.email);
-      setSuccess("Password reset email sent! Check your inbox.");
-      setResetSent(true);
-    } catch (e: any) {
-      setError(e.message || "Failed to send reset email.");
     }
   };
 
@@ -72,37 +80,13 @@ export function AccountSettingsScreen({ user, profile, onBack }: AccountSettings
         await updateDoc(userRef, { username });
       }
 
-      // 2. Update Password if requested
-      if (newPassword) {
-        if (hasPasswordProvider) {
-          // Re-authenticate first
-          if (!currentPassword) {
-            throw new Error("Current password is required to set a new password.");
-          }
-          if (user.email) {
-            const credential = EmailAuthProvider.credential(user.email, currentPassword);
-            await reauthenticateWithCredential(user, credential);
-          }
-        } 
-        
-        // Actually set the new password
-        await updatePassword(user, newPassword);
-      }
-
       setSuccess("Account settings updated successfully!");
-      setCurrentPassword('');
-      setNewPassword('');
     } catch (err: any) {
       console.error(err);
       let msg = err.message || 'Failed to update account settings.';
-      
-      const errorCode = err.code || (err.cause?.code);
-      if (errorCode === 'auth/invalid-credential') {
-        msg = 'Incorrect current password. Please verify and try again.';
-      } else if (errorCode === 'auth/requires-recent-login') {
+      if (err.code === 'auth/requires-recent-login') {
         msg = 'For security, please log out and log back in before making these changes.';
       }
-      
       setError(msg);
     } finally {
       setIsSaving(false);
@@ -153,58 +137,6 @@ export function AccountSettingsScreen({ user, profile, onBack }: AccountSettings
           </div>
         </div>
 
-        <div className="space-y-6">
-          <h3 className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40 border-b border-white/10 pb-4">Security</h3>
-          
-          {hasPasswordProvider && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40 ml-1">Current Password</label>
-                <button 
-                  type="button"
-                  onClick={handleSendResetLink}
-                  disabled={resetSent}
-                  className="text-[10px] font-display uppercase tracking-[0.2em] text-accent hover:text-accent/80 transition-colors disabled:opacity-50"
-                >
-                  Forgot it?
-                </button>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                <input 
-                  type="password" 
-                  value={currentPassword}
-                  onChange={e => setCurrentPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-black/30 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-white text-sm focus:border-accent/50 focus:outline-none transition-colors"
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40 ml-1">
-              {hasPasswordProvider ? 'New Password' : 'Set a Password'}
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-              <input 
-                type="password" 
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-black/30 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-white text-sm focus:border-accent/50 focus:outline-none transition-colors"
-              />
-            </div>
-            {!hasPasswordProvider && (
-              <p className="text-[10px] text-white/40 ml-2 mt-2">You currently sign in via Google. Set a password to also allow normal email sign-in.</p>
-            )}
-            {hasPasswordProvider && (
-              <p className="text-[10px] text-white/40 ml-2 mt-2">Leave blank to keep your current password.</p>
-            )}
-          </div>
-        </div>
-
         <button 
           type="submit"
           disabled={isSaving}
@@ -252,18 +184,9 @@ export function AccountSettingsScreen({ user, profile, onBack }: AccountSettings
                   This action is permanent. All your meals, profile data, and settings will be instantly deleted. 
                 </p>
                 
-                {hasPasswordProvider && (
-                  <div className="text-left space-y-2 mb-6">
-                    <label className="text-[10px] font-display uppercase tracking-widest text-white/40">Verify Password to continue</label>
-                    <input 
-                      type="password" 
-                      value={deleteConfirmation}
-                      onChange={e => setDeleteConfirmation(e.target.value)}
-                      placeholder="Enter your password"
-                      className="w-full bg-black/30 border border-white/5 rounded-xl px-4 py-3 text-white text-sm focus:border-danger/50 focus:outline-none transition-colors"
-                    />
-                  </div>
-                )}
+                <div className="mb-6 flex justify-center">
+                  <div id="delete-captcha-container"></div>
+                </div>
 
                 {deleteError && (
                   <p className="text-danger text-xs mb-4 p-2 bg-danger/10 border border-danger/20 rounded-lg">{deleteError}</p>
@@ -274,7 +197,6 @@ export function AccountSettingsScreen({ user, profile, onBack }: AccountSettings
                     onClick={() => {
                       setShowDeleteModal(false);
                       setDeleteError('');
-                      setDeleteConfirmation('');
                     }}
                     className="flex-1 py-3 text-xs font-display uppercase tracking-widest text-white bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
                   >
@@ -282,7 +204,7 @@ export function AccountSettingsScreen({ user, profile, onBack }: AccountSettings
                   </button>
                   <button 
                     onClick={handleDeleteAccount}
-                    disabled={isDeleting || (hasPasswordProvider && !deleteConfirmation)}
+                    disabled={isDeleting || !captchaResolved}
                     className="flex-1 py-3 text-xs font-display uppercase tracking-widest text-white bg-danger hover:bg-danger/80 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center"
                   >
                     {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}

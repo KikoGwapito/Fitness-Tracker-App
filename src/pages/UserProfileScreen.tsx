@@ -21,28 +21,6 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
   const [isEditing, setIsEditing] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteConfirmation, setDeleteConfirmation] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
-
-  const handleDeleteAccount = async () => {
-    setDeleteError('');
-    setIsDeleting(true);
-    try {
-      if (user.providerData.some(p => p.providerId === 'password')) {
-        await firebaseService.reauthenticateAndVerify(user, deleteConfirmation, 'email');
-      }
-      await firebaseService.deleteAccountAndData(user);
-      // Let auth observer catch the deletion
-    } catch (e: any) {
-      console.error(e);
-      setDeleteError(e.message || "Failed to delete account. You may need to log out and log back in.");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   useEffect(() => {
     if ('Notification' in window) {
