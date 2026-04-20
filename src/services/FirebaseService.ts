@@ -2,21 +2,7 @@ import { auth, db } from '../firebase';
 import { 
   GoogleAuthProvider, 
   signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
-  User,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  PhoneAuthProvider,
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  deleteUser,
-  reauthenticateWithPopup,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  fetchSignInMethodsForEmail
+  User 
 } from 'firebase/auth';
 import { 
   collection, 
@@ -35,36 +21,6 @@ import { FoodLog, UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
 
 class FirebaseService {
-  setupDeleteRecaptcha(containerId: string, onVerified: () => void) {
-    if (!(window as any).deleteRecaptchaVerifier) {
-      (window as any).deleteRecaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-        size: 'normal',
-        callback: () => {
-          onVerified();
-        },
-        'expired-callback': () => {
-          // Response expired, reset state if needed
-        }
-      });
-      (window as any).deleteRecaptchaVerifier.render();
-    }
-    return (window as any).deleteRecaptchaVerifier;
-  }
-
-  async deleteAccountAndData(user: User) {
-    // Note: Due to security rules, users can delete their own documents.
-    // Realistically a Cloud Function should clean up all nested collections, 
-    // but we'll try to delete what we can here.
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      await deleteDoc(userRef);
-      await deleteUser(user);
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
-  }
-
   /**
    * Authentication Logic: Implement a signInWithGoogle() function using firebase_auth.
    * Ensure the User object is captured to retrieve the unique uid.
@@ -72,32 +28,11 @@ class FirebaseService {
   async signInWithGoogle(): Promise<User | null> {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    
-    // Use redirect for standalone versions (like deployed .run.app) 
-    // to avoid popup block/auth domain issues, but use popup in AI Studio iframe.
-    const isInIframe = window.self !== window.top;
-    
     try {
-      if (!isInIframe) {
-        await signInWithRedirect(auth, provider);
-        return null;
-      }
       const result = await signInWithPopup(auth, provider);
       return result.user;
-    } catch (error: any) {
-      if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
-        console.error("Error signing in with Google:", error);
-      }
-      throw error;
-    }
-  }
-
-  async handleRedirectResult(): Promise<User | null> {
-    try {
-      const result = await getRedirectResult(auth);
-      return result?.user || null;
     } catch (error) {
-      console.error("Redirect result error:", error);
+      console.error("Error signing in with Google:", error);
       throw error;
     }
   }

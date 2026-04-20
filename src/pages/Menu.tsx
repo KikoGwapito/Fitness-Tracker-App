@@ -5,7 +5,7 @@ import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface MenuProps {
-  onNavigate: (page: 'profile' | 'basic-info' | 'app-info' | 'favorites' | 'account-settings') => void;
+  onNavigate: (page: 'profile' | 'basic-info' | 'app-info' | 'favorites') => void;
   onLogout: () => void;
   onUpdateSettings: (settings: UserSettings) => void;
   userEmail?: string;
@@ -115,7 +115,6 @@ export function MenuScreen({ onNavigate, onLogout, onUpdateSettings, userEmail, 
             {/* Navigation Buttons */}
             <div className="space-y-4">
               <h3 className="text-[10px] font-display uppercase tracking-[0.3em] text-white/20 px-2 mb-4">Account Settings</h3>
-              <MenuButton icon={User} label="Account & Security" onClick={() => onNavigate('account-settings')} />
               <MenuButton icon={Star} label="Favorite Meals" onClick={() => onNavigate('favorites')} />
               <MenuButton icon={Settings} label="Edit Profile" onClick={() => onNavigate('profile')} />
               <MenuButton icon={Activity} label="Health Goals & Info" onClick={() => onNavigate('basic-info')} />

@@ -74,7 +74,8 @@ export function useNotifications(
             registration.showNotification(title, {
               body,
               icon: '/vite.svg',
-              badge: '/vite.svg'
+              badge: '/vite.svg',
+              vibrate: [200, 100, 200]
             });
           }).catch(() => {
             new Notification(title, { body, icon: '/vite.svg' });

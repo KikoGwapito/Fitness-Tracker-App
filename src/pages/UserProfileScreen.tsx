@@ -4,11 +4,10 @@ import { User } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
-import { Loader2, Save, ChevronLeft, Camera, Trash2, Bell, BellOff, Activity, AlertTriangle } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Loader2, Save, ChevronLeft, Camera, Trash2, Bell, BellOff, Activity } from 'lucide-react';
+import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { COUNTRIES } from '../lib/countries';
-import { firebaseService } from '../services/FirebaseService';
 
 interface UserProfileScreenProps {
   user: User;
@@ -133,25 +132,10 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
         updateData.age = age;
       }
 
-      try {
-        await updateDoc(userRef, updateData);
-      } catch (firestoreErr) {
-        handleFirestoreError(firestoreErr, OperationType.UPDATE, `users/${user.uid}`);
-      }
+      await updateDoc(userRef, updateData);
       setIsEditing(false);
-    } catch (error: any) {
-      console.error(error);
-      let displayMsg = error.message;
-      if (displayMsg && displayMsg.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(displayMsg);
-          displayMsg = parsed.error;
-        } catch (e) {
-            // keep original
-        }
-      }
-      // You can set an error state here if `UserProfileScreen` had one, but it doesn't currently seem to display errors in the UI. We'll just throw the clean message or alert it if needed.
-      // Since there's no `setError` here locally in the context we see, throwing it would be handled by boundary, but let's just log it cleanly.
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
     } finally {
       setIsSaving(false);
     }
@@ -235,6 +219,23 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
             ) : (
               <div className="text-2xl font-display uppercase text-white">
                 {formData.name || 'Not set'}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Username</label>
+            {isEditing ? (
+              <input 
+                type="text" 
+                value={formData.username}
+                onChange={e => setFormData({ ...formData, username: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                placeholder="@username"
+              />
+            ) : (
+              <div className="text-xl font-display uppercase text-white/60">
+                {formData.username ? `@${formData.username}` : 'Not set'}
               </div>
             )}
           </div>

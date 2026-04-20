@@ -6,6 +6,8 @@ import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
 import { Loader2, Save, ChevronLeft } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { motion } from 'motion/react';
+import { COUNTRIES } from '../lib/countries';
 
 interface BasicInfoScreenProps {
   user: User;
@@ -15,16 +17,9 @@ interface BasicInfoScreenProps {
 
 export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const [errorInfo, setErrorInfo] = useState('');
-
-  const [isEditing, setIsEditing] = useState(() => {
-    return !profile?.weight_kg || !profile?.height_cm;
-  });
+  const [isEditing, setIsEditing] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: profile?.name || '',
-    username: profile?.username || '',
-    birthday: profile?.birthday || '',
     age: profile?.age || 30,
     gender: profile?.gender || 'male',
     weight_kg: profile?.weight_kg || 70,
@@ -36,9 +31,6 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
   useEffect(() => {
     if (profile) {
       setFormData({
-        name: profile.name || '',
-        username: profile.username || '',
-        birthday: profile.birthday || '',
         age: profile.age || 30,
         gender: profile.gender || 'male',
         weight_kg: profile.weight_kg || 70,
@@ -48,21 +40,6 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
       });
     }
   }, [profile]);
-
-  useEffect(() => {
-    if (formData.birthday) {
-      const birthDate = new Date(formData.birthday);
-      const today = new Date();
-      let calculatedAge = today.getFullYear() - birthDate.getFullYear();
-      const m = today.getMonth() - birthDate.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        calculatedAge--;
-      }
-      if (calculatedAge !== formData.age) {
-        setFormData(prev => ({ ...prev, age: calculatedAge > 0 ? calculatedAge : 0 }));
-      }
-    }
-  }, [formData.birthday]);
 
   const calculateMacros = (): DailyGoals & { bmr: number } => {
     const { age, gender, weight_kg, height_cm, activity_level, goal } = formData;
@@ -87,9 +64,6 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
     if (goal === 'gain') tdee += 500;
     if (goal === 'extreme_gain') tdee += 1000;
 
-    // Safety limit: Don't let calories go below 1200 for adults
-    if (tdee < 1200) tdee = 1200;
-
     const calories = Math.round(tdee);
     
     // Macros: Protein 2g/kg, Fat 0.8g/kg, Carbs remainder
@@ -98,8 +72,6 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
     
     const proteinCals = protein_g * 4;
     const fatCals = fat_g * 9;
-    
-    // If calories are extremely low, prioritize protein/fat and prevent negative carbs
     const carbs_g = Math.round(Math.max(0, (calories - proteinCals - fatCals) / 4));
     const sugar_g = Math.round(calories * 0.1 / 4); // 10% of calories from sugar
     const sodium_mg = 2300; // Standard daily limit
@@ -109,45 +81,26 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
 
   const handleSave = async () => {
     setIsSaving(true);
-    setErrorInfo('');
     try {
-      if (!formData.birthday) throw new Error("Birthday is required.");
-      if (!formData.weight_kg || formData.weight_kg <= 0) throw new Error("A valid specific weight is required.");
-      if (!formData.height_cm || formData.height_cm <= 0) throw new Error("A valid height is required.");
-      
       const calculated = calculateMacros();
       const userRef = doc(db, 'users', user.uid);
       
-      try {
-        await updateDoc(userRef, {
-          ...formData,
-          daily_goals: {
-            calories: calculated.calories,
-            protein_g: calculated.protein_g,
-            carbs_g: calculated.carbs_g,
-            fat_g: calculated.fat_g,
-            sugar_g: calculated.sugar_g,
-            sodium_mg: calculated.sodium_mg,
-          },
-          bmr: calculated.bmr,
-        });
-      } catch (firestoreErr: any) {
-        handleFirestoreError(firestoreErr, OperationType.UPDATE, `users/${user.uid}`);
-      }
+      await updateDoc(userRef, {
+        ...formData,
+        daily_goals: {
+          calories: calculated.calories,
+          protein_g: calculated.protein_g,
+          carbs_g: calculated.carbs_g,
+          fat_g: calculated.fat_g,
+          sugar_g: calculated.sugar_g,
+          sodium_mg: calculated.sodium_mg,
+        },
+        bmr: calculated.bmr,
+      });
       
       setIsEditing(false);
-    } catch (error: any) {
-      console.error(error);
-      let displayMsg = error.message;
-      if (displayMsg.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(displayMsg);
-          displayMsg = parsed.error;
-        } catch (e) {
-            // keep original
-        }
-      }
-      setErrorInfo(displayMsg || 'Failed to update profile.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
     } finally {
       setIsSaving(false);
     }
@@ -192,71 +145,6 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
       </header>
 
       <div className="vonas-card space-y-12">
-        {errorInfo && (
-          <div className="bg-danger/10 text-danger text-xs p-4 rounded-xl border border-danger/20">
-            {errorInfo}
-          </div>
-        )}
-        
-        {/* Profile Information */}
-        <div className="space-y-8">
-          <div className="flex justify-between items-end border-b border-white/10 pb-4">
-            <h3 className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Profile Information</h3>
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Full Name</label>
-            {isEditing ? (
-              <input 
-                type="text" 
-                value={formData.name}
-                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. Jane Doe"
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
-              />
-            ) : (
-              <div className="text-2xl font-display text-white">
-                {formData.name || <span className="text-white/20 italic text-sm">Not set</span>}
-              </div>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-2 gap-8">
-            <div className="space-y-2">
-              <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Username</label>
-              {isEditing ? (
-                <input 
-                  type="text" 
-                  value={formData.username}
-                  onChange={e => setFormData({ ...formData, username: e.target.value })}
-                  placeholder="@username"
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
-                />
-              ) : (
-                <div className="text-xl font-display text-white">
-                  {formData.username ? `@${formData.username}` : <span className="text-white/20 italic text-sm">Not set</span>}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Birthday</label>
-              {isEditing ? (
-                <input 
-                  type="date" 
-                  value={formData.birthday}
-                  onChange={e => setFormData({ ...formData, birthday: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
-                />
-              ) : (
-                <div className="text-xl font-display text-white">
-                  {formData.birthday || <span className="text-white/20 italic text-sm">Not set</span>}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* Physical Stats */}
         <div className="space-y-8">
           <div className="flex justify-between items-end border-b border-white/10 pb-4">
@@ -275,11 +163,17 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
           <div className="grid grid-cols-2 gap-8">
             <div className="space-y-2">
               <label className="text-[10px] font-display uppercase tracking-[0.2em] text-white/40">Age</label>
-              <div className="text-2xl font-display text-white">
-                {formData.age > 0 ? formData.age : '--'} <span className="text-xs text-white/20 font-sans tracking-normal lowercase">yrs</span>
-              </div>
-              {isEditing && (
-                <p className="text-[10px] text-white/20 mt-1">Calculated from birthday</p>
+              {isEditing ? (
+                <input 
+                  type="number" 
+                  value={formData.age}
+                  onChange={e => setFormData({ ...formData, age: Number(e.target.value) })}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                />
+              ) : (
+                <div className="text-2xl font-display text-white">
+                  {formData.age} <span className="text-xs text-white/20 font-sans tracking-normal lowercase">yrs</span>
+                </div>
               )}
             </div>
             <div className="space-y-2">
@@ -309,7 +203,7 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
                   type="number" 
                   value={formData.weight_kg}
                   onChange={e => setFormData({ ...formData, weight_kg: Number(e.target.value) })}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
                 />
               ) : (
                 <div className="text-2xl font-display text-white">
@@ -324,7 +218,7 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
                   type="number" 
                   value={formData.height_cm}
                   onChange={e => setFormData({ ...formData, height_cm: Number(e.target.value) })}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
                 />
               ) : (
                 <div className="text-2xl font-display text-white">
