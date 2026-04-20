@@ -182,6 +182,15 @@ export default function App() {
 
   // Auth Listener
   useEffect(() => {
+    // Check for redirect result on load (important for deployed version)
+    firebaseService.handleRedirectResult().then(redirectedUser => {
+      if (redirectedUser) {
+        setUser(redirectedUser);
+      }
+    }).catch(err => {
+      console.warn("Redirect handling failed:", err);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setIsAuthReady(true);

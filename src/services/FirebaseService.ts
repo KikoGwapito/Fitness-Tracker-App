@@ -2,6 +2,8 @@ import { auth, db } from '../firebase';
 import { 
   GoogleAuthProvider, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   User,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -70,13 +72,32 @@ class FirebaseService {
   async signInWithGoogle(): Promise<User | null> {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
+    
+    // Use redirect for standalone versions (like deployed .run.app) 
+    // to avoid popup block/auth domain issues, but use popup in AI Studio iframe.
+    const isInIframe = window.self !== window.top;
+    
     try {
+      if (!isInIframe) {
+        await signInWithRedirect(auth, provider);
+        return null;
+      }
       const result = await signInWithPopup(auth, provider);
       return result.user;
     } catch (error: any) {
       if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
         console.error("Error signing in with Google:", error);
       }
+      throw error;
+    }
+  }
+
+  async handleRedirectResult(): Promise<User | null> {
+    try {
+      const result = await getRedirectResult(auth);
+      return result?.user || null;
+    } catch (error) {
+      console.error("Redirect result error:", error);
       throw error;
     }
   }
