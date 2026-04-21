@@ -264,6 +264,7 @@ export default function App() {
       try {
         const image = await Camera.getPhoto({
           quality: 60,
+          width: 600,
           allowEditing: false,
           resultType: CameraResultType.DataUrl,
           source: CameraSource.Prompt
