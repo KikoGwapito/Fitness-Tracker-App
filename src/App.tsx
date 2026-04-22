@@ -166,12 +166,23 @@ export default function App() {
   });
 
   const mainContentRef = useRef<HTMLElement>(null);
+  const loggingModalContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (mainContentRef.current) {
       mainContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [activeTab, subPage]);
+
+  // Scroll logging modal to top when pending analysis state changes
+  useEffect(() => {
+    if (pendingAnalysis && loggingModalContentRef.current) {
+      // Small timeout to allow the layout animation to complete
+      setTimeout(() => {
+        loggingModalContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 50);
+    }
+  }, [pendingAnalysis]);
 
   // Auth Listener
   useEffect(() => {
@@ -634,8 +645,8 @@ export default function App() {
                 <div className="flex items-start gap-4">
                   <MessageSquare className="w-6 h-6 text-blue-400 shrink-0" />
                   <div>
-                    <h3 className="text-sm font-display uppercase tracking-widest text-white">3. Get Coached</h3>
-                    <p className="text-xs text-white/40 mt-1">Use the AI Coach to ask nutrition questions, get personalized advice, or clarify meal entries.</p>
+                    <h3 className="text-sm font-display uppercase tracking-widest text-white">3. Meet Coach Gref</h3>
+                    <p className="text-xs text-white/40 mt-1">Use your dedicated AI Coach, Gref, to ask nutrition questions, get personalized advice, or clarify meal entries.</p>
                   </div>
                 </div>
               </div>
@@ -885,10 +896,33 @@ export default function App() {
                 </h2>
                 <button 
                   onClick={() => {
-                    setIsLogging(false);
-                    setLoggingDate(null);
-                    setEditingLog(null);
-                    setEditingMode(null);
+                    const hasData = textInput.trim().length > 0 || selectedImage !== null || pendingAnalysis !== null;
+                    if (hasData) {
+                      setConfirmModal({
+                        isOpen: true,
+                        title: 'Abort Logging',
+                        message: 'Are you sure you want to abort logging? Your progress will be lost.',
+                        onConfirm: () => {
+                          setIsLogging(false);
+                          setLoggingDate(null);
+                          setEditingLog(null);
+                          setEditingMode(null);
+                          setTextInput('');
+                          setSelectedImage(null);
+                          setPendingAnalysis(null);
+                          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                        },
+                        variant: 'danger'
+                      });
+                    } else {
+                      setIsLogging(false);
+                      setLoggingDate(null);
+                      setEditingLog(null);
+                      setEditingMode(null);
+                      setTextInput('');
+                      setSelectedImage(null);
+                      setPendingAnalysis(null);
+                    }
                   }}
                   className="p-2 bg-white/5 rounded-full text-ink/40 hover:text-white"
                 >
@@ -896,7 +930,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8 relative max-w-2xl mx-auto w-full">
+              <div ref={loggingModalContentRef} className="flex-1 overflow-y-auto p-6 flex flex-col gap-8 relative max-w-2xl mx-auto w-full">
                 
                 {pendingAnalysis ? (
                   <motion.div 
@@ -976,7 +1010,6 @@ export default function App() {
                         
                         <label className="text-[10px] font-display uppercase tracking-widest text-ink/40">Or type your answer</label>
                         <textarea 
-                          autoFocus
                           placeholder="e.g., It was grilled dry, no oil used."
                           className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-5 text-white placeholder:text-ink/20 focus:outline-none focus:border-accent resize-none transition-all font-light"
                           onKeyDown={(e) => {

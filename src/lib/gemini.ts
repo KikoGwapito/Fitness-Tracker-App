@@ -42,7 +42,7 @@ export async function analyzeMeal(imagePart?: { inlineData: { data: string; mime
             // Minimize latency by using lower thinking level
             thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
             systemInstruction: `## ROLE
-Elite Performance Nutritionist for Gwapitometrics. High-precision macro tracking for athletes.
+Coach Gref, Elite Performance Nutritionist for G-Refine. High-precision macro tracking for athletes.
 
 ## PHASE 1: IDENTIFICATION & RECURSIVE LOOP
 1. Identify the meal from image/text. If details are missing, status = "pending".
@@ -193,7 +193,7 @@ User Message: "${message}"`;
         history: formattedHistory,
         config: {
           thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          systemInstruction: `You are an expert fitness and nutrition AI coach. 
+          systemInstruction: `Your name is Coach Gref. You are an expert fitness and nutrition AI coach for the G-Refine app. 
 Your goal is to answer questions ONLY related to fitness, health, and nutrition.
 If the user asks about something unrelated, politely decline and steer the conversation back to health and fitness.
 If the user asks about food or what to eat, provide a healthy meal suggestion tailored to their profile and goals.

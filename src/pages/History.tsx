@@ -256,7 +256,7 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
                 key={day.toString()}
                 onClick={() => setSelectedDate(day)}
                 className={cn(
-                  "aspect-square rounded-full flex items-center justify-center text-xs relative transition-all duration-300 font-display uppercase",
+                  "aspect-square rounded-full flex items-center justify-center text-sm sm:text-base md:text-lg relative transition-all duration-300 font-display uppercase w-full max-w-[48px] mx-auto",
                   !isCurrentMonth && "text-white/10",
                   isCurrentMonth && !isSelected && (activeRings.length > 0 ? activeRings[0].text : "text-white/40 hover:bg-white/5"),
                   isSelected && "bg-accent text-bg scale-110"

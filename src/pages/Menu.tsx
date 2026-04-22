@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Info, LogOut, ChevronRight, Settings, Activity, Palette, Type, Moon, Sun, ChevronLeft, Star } from 'lucide-react';
+import { User, Info, LogOut, ChevronRight, Settings, Activity, Palette, Type, Moon, Sun, ChevronLeft, Star, Download, Upload, Trash2, AlertTriangle } from 'lucide-react';
 import { UserProfile, FoodLog, UserSettings } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { DataManagementModal } from '../components/DataManagementModal';
 
 interface MenuProps {
   onNavigate: (page: 'profile' | 'basic-info' | 'app-info' | 'favorites') => void;
@@ -57,6 +58,8 @@ export function MenuScreen({ onNavigate, onLogout, onUpdateSettings, userEmail, 
     theme: 'dark',
     fontFamily: 'Anton, sans-serif'
   };
+
+  const [isDataModalOpen, setIsDataModalOpen] = useState(false);
 
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto pb-32 px-6 pt-12 space-y-12 max-w-5xl mx-auto w-full">
@@ -118,6 +121,7 @@ export function MenuScreen({ onNavigate, onLogout, onUpdateSettings, userEmail, 
               <MenuButton icon={Star} label="Favorite Meals" onClick={() => onNavigate('favorites')} />
               <MenuButton icon={Settings} label="Edit Profile" onClick={() => onNavigate('profile')} />
               <MenuButton icon={Activity} label="Health Goals & Info" onClick={() => onNavigate('basic-info')} />
+              <MenuButton icon={Download} label="Statements & Reports" onClick={() => setIsDataModalOpen(true)} />
               <MenuButton icon={Palette} label="App Settings" onClick={() => setView('settings')} />
               <MenuButton icon={Info} label="App Information" onClick={() => onNavigate('app-info')} />
             </div>
@@ -256,6 +260,13 @@ export function MenuScreen({ onNavigate, onLogout, onUpdateSettings, userEmail, 
           </motion.div>
         )}
       </AnimatePresence>
+
+      <DataManagementModal 
+        isOpen={isDataModalOpen} 
+        onClose={() => setIsDataModalOpen(false)} 
+        userProfile={profile}
+        foodLogs={logs}
+      />
     </div>
   );
 }

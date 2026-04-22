@@ -30,7 +30,7 @@ export function AICoachModal({ isOpen, onClose, profile, onLogSuggestedMeal }: A
     {
       id: '1',
       role: 'ai',
-      text: "Hi! I'm your AI fitness coach. Ask me anything about fitness, health, or nutrition. If you need meal ideas, just ask!"
+      text: "Hi! I'm Coach Gref, your AI fitness coach. Ask me anything about fitness, health, or nutrition. If you need meal ideas, just ask!"
     }
   ]);
   const [input, setInput] = useState('');
@@ -106,8 +106,8 @@ export function AICoachModal({ isOpen, onClose, profile, onLogSuggestedMeal }: A
                   <Bot className="w-5 h-5 text-accent" />
                 </div>
                 <div>
-                  <h3 className="font-display uppercase tracking-widest text-sm">AI Coach</h3>
-                  <p className="text-[10px] text-white/40 uppercase tracking-widest">Fitness & Nutrition</p>
+                  <h3 className="font-display uppercase tracking-widest text-sm">Coach Gref</h3>
+                  <p className="text-[10px] text-white/40 uppercase tracking-widest">AI Fitness & Nutrition</p>
                 </div>
               </div>
               <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">

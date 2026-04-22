@@ -189,9 +189,10 @@ export function Progress({ logs, profile }: ProgressProps) {
           </div>
           <h3 className="text-sm font-display uppercase tracking-widest text-white">Calorie Trend</h3>
         </div>
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-            <LineChart data={chartData}>
+        <div className="overflow-x-auto hide-scrollbar">
+          <div className="h-64 min-w-[500px] w-full">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis 
                 dataKey="name" 
@@ -222,6 +223,7 @@ export function Progress({ logs, profile }: ProgressProps) {
               />
             </LineChart>
           </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
@@ -233,9 +235,10 @@ export function Progress({ logs, profile }: ProgressProps) {
           </div>
           <h3 className="text-sm font-display uppercase tracking-widest text-white">Macro Distribution</h3>
         </div>
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-            <BarChart data={chartData}>
+        <div className="overflow-x-auto hide-scrollbar">
+          <div className="h-64 min-w-[500px] w-full">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis 
                 dataKey="name" 
@@ -264,6 +267,7 @@ export function Progress({ logs, profile }: ProgressProps) {
               <Bar dataKey="calories" stackId="a" fill="var(--c-accent)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </div>
         <div className="flex justify-center gap-4 flex-wrap mt-8">
           {[
