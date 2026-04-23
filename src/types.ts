@@ -18,6 +18,7 @@ export interface UserProfile {
   language?: string;
   birthday?: string;
   tour_completed?: boolean;
+  is_setup_completed?: boolean;
 }
 
 export interface DailyGoals {

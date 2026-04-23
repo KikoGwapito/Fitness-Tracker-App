@@ -113,14 +113,14 @@ export default function App() {
       // 1. Setup / Tour Logic
       if (profile.tour_completed !== true) {
         setShowTour(true);
-      } else if (!profile.weight_kg || !profile.height_cm || !profile.age || !profile.activity_level) {
+      } else if (!profile.is_setup_completed && profile.weight_kg === undefined) {
         setIsMandatorySetup(true);
       } else {
         setIsMandatorySetup(false);
       }
 
       // 2. Forgotten Meals Prompt Logic (only if setup is complete and not on tour)
-      if (profile.tour_completed && profile.weight_kg) {
+      if (profile.tour_completed && (profile.is_setup_completed || profile.weight_kg !== undefined)) {
         const todayStr = new Date().toDateString();
         const lastPromptStr = localStorage.getItem(`forgotMealPrompt_${user.uid}`);
         

@@ -17,7 +17,7 @@ interface BasicInfoScreenProps {
 
 export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(!profile?.is_setup_completed && profile?.weight_kg === undefined);
 
   const [formData, setFormData] = useState({
     age: profile?.age || 30,
@@ -96,6 +96,7 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
           sodium_mg: calculated.sodium_mg,
         },
         bmr: calculated.bmr,
+        is_setup_completed: true
       });
       
       setIsEditing(false);
