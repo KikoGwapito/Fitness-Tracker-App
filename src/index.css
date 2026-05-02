@@ -142,6 +142,16 @@
   background: #f27d26;
 }
 
+/* Remove arrows/spinners from number inputs */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 @keyframes slamIn {
   0% { transform: scale(1.5) translateY(50px); opacity: 0; }
   100% { transform: scale(1) translateY(0); opacity: 1; }

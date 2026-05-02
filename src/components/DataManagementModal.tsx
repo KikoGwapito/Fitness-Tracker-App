@@ -75,9 +75,8 @@ export function DataManagementModal({ isOpen, onClose, userProfile, foodLogs }: 
       // Show newest days first in the text breakdown
       const reversedLabels = [...chartLabels].reverse();
       
-      reversedLabels.forEach((date, index) => {
+      reversedLabels.forEach(date => {
         const dayLogs = groupedLogs[date];
-        // Ensure a reliable parseable attribute for sorting
         const dayTimestamp = new Date(date).getTime();
 
         const dayCals = dayLogs.reduce((sum, log) => sum + (log.macros.calories || 0), 0);
@@ -309,6 +308,7 @@ export function DataManagementModal({ isOpen, onClose, userProfile, foodLogs }: 
                 pointBorderColor: '#111',
                 pointBorderWidth: 2,
                 pointRadius: 4,
+                pointHoverRadius: 6,
                 fill: true,
                 tension: 0.3
               }]
@@ -343,7 +343,7 @@ export function DataManagementModal({ isOpen, onClose, userProfile, foodLogs }: 
               maintainAspectRatio: false,
               plugins: {
                 legend: { display: false },
-                title: { display: true, text: 'Protein Intra-day (g)', color: '#fff', align: 'start', font: { size: 14 } },
+                title: { display: true, text: 'Protein Intake (g)', color: '#fff', align: 'start', font: { size: 14 } },
                 tooltip: { backgroundColor: '#222', padding: 12, displayColors: false }
               },
               scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: gridOptions } }

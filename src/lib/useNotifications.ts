@@ -10,6 +10,7 @@ const NOTIFICATION_STATE_KEY = 'vonas_notification_state';
 interface NotificationState {
   date: string;
   macrosExceeded: string[];
+  macrosAchieved: string[];
   endOfDayWarning: boolean;
   todayEvents: boolean;
   upcomingEvents: boolean;
@@ -44,10 +45,12 @@ export function useNotifications(
       const savedState = localStorage.getItem(NOTIFICATION_STATE_KEY);
       let state: NotificationState = savedState 
         ? JSON.parse(savedState) 
-        : { date: todayStr, macrosExceeded: [], endOfDayWarning: false, todayEvents: false, upcomingEvents: false };
+        ? { macrosAchieved: [], ...JSON.parse(savedState) }
+        : { date: todayStr, macrosExceeded: [], macrosAchieved: [], endOfDayWarning: false, todayEvents: false, upcomingEvents: false }
+        : { date: todayStr, macrosExceeded: [], macrosAchieved: [], endOfDayWarning: false, todayEvents: false, upcomingEvents: false };
 
       if (state.date !== todayStr) {
-        state = { date: todayStr, macrosExceeded: [], endOfDayWarning: false, todayEvents: false, upcomingEvents: false };
+        state = { date: todayStr, macrosExceeded: [], macrosAchieved: [], endOfDayWarning: false, todayEvents: false, upcomingEvents: false };
       }
 
       let stateChanged = false;
@@ -104,7 +107,7 @@ export function useNotifications(
       };
       const goals = { ...defaultGoals, ...(profile?.daily_goals || {}) };
 
-      // 1. Macros Exceeded
+      // 1. Macros Exceeded & Achieved
       const macroChecks = [
         { key: 'calories', name: 'Calories', limit: goals.calories, id: 101 },
         { key: 'protein_g', name: 'Protein', limit: goals.protein_g, id: 102 },
@@ -115,10 +118,23 @@ export function useNotifications(
       ];
 
       for (const macro of macroChecks) {
-        if (totals[macro.key as keyof typeof totals] > macro.limit && !state.macrosExceeded.includes(macro.key)) {
-          await sendNotify('Macro Limit Exceeded', `You have exceeded your daily limit for ${macro.name}.`, macro.id);
-          state.macrosExceeded.push(macro.key);
-          stateChanged = true;
+        const isProtein = macro.key === 'protein_g';
+        const currentValue = totals[macro.key as keyof typeof totals];
+        
+        // Protein specific logic
+        if (isProtein) {
+          if (currentValue >= macro.limit * 0.9 && !state.macrosAchieved.includes(macro.key)) {
+            await sendNotify('Target Achieved!', `Great job! You have successfully hit your daily protein intake.`, macro.id);
+            state.macrosAchieved.push(macro.key);
+            stateChanged = true;
+          }
+        } else {
+          // Other macros exceeding
+          if (currentValue > macro.limit && !state.macrosExceeded.includes(macro.key)) {
+            await sendNotify('Macro Limit Exceeded', `You have exceeded your daily limit for ${macro.name}.`, macro.id);
+            state.macrosExceeded.push(macro.key);
+            stateChanged = true;
+          }
         }
       }
 

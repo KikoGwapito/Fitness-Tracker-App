@@ -24,11 +24,22 @@ export function MacroRing({
 }: MacroRingProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
-  const isOver = value > max;
-  const percent = max > 0 ? Math.min(value / max, 1) : 0;
+  
+  const isProtein = label.toLowerCase() === 'protein';
+  const percentRatio = max > 0 ? (value / max) : 0;
+  
+  let currentStatus: 'normal' | 'success' | 'warning' = 'normal';
+  
+  if (percentRatio > 1) {
+    currentStatus = isProtein ? 'success' : 'warning';
+  } else if (percentRatio >= 0.9) {
+    currentStatus = 'success';
+  }
+
+  const percent = Math.min(percentRatio, 1);
   const offset = circumference - percent * circumference;
   
-  const displayColor = isOver ? '#ff4444' : color;
+  const displayColor = currentStatus === 'success' ? '#10b981' : currentStatus === 'warning' ? '#ef4444' : color;
   const filterId = `glow-${label.replace(/\s+/g, '-')}`;
 
   return (
@@ -62,14 +73,15 @@ export function MacroRing({
           filter={`url(#${filterId})`}
           className={cn(
             "transition-all duration-1000 ease-out",
-            isOver ? "animate-pulse" : "animate-[pulse_3s_ease-in-out_infinite]"
+            currentStatus === 'warning' ? "animate-pulse" : "animate-[pulse_3s_ease-in-out_infinite]"
           )}
         />
       </svg>
       <div className="absolute flex flex-col items-center justify-center text-center transition-transform duration-300 group-hover:scale-110">
         <span className={cn(
           "text-lg font-display uppercase leading-none tracking-tight",
-          isOver ? "text-danger drop-shadow-[0_0_8px_rgba(255,68,68,0.8)]" : "text-white"
+          currentStatus === 'warning' ? "text-danger drop-shadow-[0_0_8px_rgba(255,68,68,0.8)]" : 
+          currentStatus === 'success' ? "text-success drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "text-white"
         )}>
           {Math.round(value)}
         </span>
@@ -77,8 +89,11 @@ export function MacroRing({
           {label}
         </span>
       </div>
-      {isOver && (
-        <div className="absolute -top-1 -right-1 w-2 h-2 bg-danger rounded-full animate-ping shadow-[0_0_8px_#ff4444]" />
+      {currentStatus === 'warning' && (
+        <div className="absolute -top-1 -right-1 w-2 h-2 bg-danger rounded-full animate-ping shadow-[0_0_8px_#ef4444]" />
+      )}
+      {currentStatus === 'success' && (
+        <div className="absolute -top-1 -right-1 w-2 h-2 bg-success rounded-full animate-ping shadow-[0_0_8px_#10b981]" />
       )}
     </div>
   );

@@ -106,6 +106,7 @@ export default function App() {
   const [showTour, setShowTour] = useState(false);
   const [tourStep, setTourStep] = useState(0);
   const [isMandatorySetup, setIsMandatorySetup] = useState(false);
+  const [isMandatoryProfileSetup, setIsMandatoryProfileSetup] = useState(false);
 
   // Check for the End of Day forgot meals prompt & Mandatory Setup
   useEffect(() => {
@@ -113,14 +114,19 @@ export default function App() {
       // 1. Setup / Tour Logic
       if (profile.tour_completed !== true) {
         setShowTour(true);
-      } else if (!profile.is_setup_completed && profile.weight_kg === undefined) {
+      } else if (!profile.is_setup_completed || profile.weight_kg === undefined) {
         setIsMandatorySetup(true);
+        setIsMandatoryProfileSetup(false);
+      } else if (!profile.name || !profile.username || !profile.birthday) {
+        setIsMandatorySetup(false);
+        setIsMandatoryProfileSetup(true);
       } else {
         setIsMandatorySetup(false);
+        setIsMandatoryProfileSetup(false);
       }
 
       // 2. Forgotten Meals Prompt Logic (only if setup is complete and not on tour)
-      if (profile.tour_completed && (profile.is_setup_completed || profile.weight_kg !== undefined)) {
+      if (profile.tour_completed && (profile.is_setup_completed || profile.weight_kg !== undefined) && profile.name && profile.username && profile.birthday) {
         const todayStr = new Date().toDateString();
         const lastPromptStr = localStorage.getItem(`forgotMealPrompt_${user.uid}`);
         
@@ -692,7 +698,35 @@ export default function App() {
             </motion.div>
           )}
 
-          {!showTour && !isMandatorySetup && showForgotMealPrompt && (
+          {!showTour && !isMandatorySetup && isMandatoryProfileSetup && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 bg-bg overflow-y-auto"
+            >
+              <div className="max-w-xl mx-auto w-full p-6 pt-12 space-y-8">
+                <div className="text-center">
+                  <h1 className="text-3xl font-display uppercase tracking-widest text-white mb-2">Almost Done</h1>
+                  <p className="text-xs font-display uppercase tracking-widest text-white/40">
+                    We just need a few more details to complete your profile setup.
+                  </p>
+                </div>
+                
+                <div className="relative">
+                  <UserProfileScreen 
+                    user={user} 
+                    profile={profile} 
+                    onBack={() => {}} // Disabled back navigation
+                  />
+                  {/* Block the back button visually */}
+                  <div className="absolute top-4 left-4 right-4 h-12 bg-bg/50 backdrop-blur z-10 flex items-center justify-center border border-accent/20 rounded-xl">
+                    <span className="text-[10px] font-display uppercase tracking-widest text-accent">Required Information</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {!showTour && !isMandatorySetup && !isMandatoryProfileSetup && showForgotMealPrompt && (
             <div className="absolute inset-0 z-50 bg-bg/80 backdrop-blur-sm flex items-center justify-center p-6">
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}

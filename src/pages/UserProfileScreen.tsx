@@ -17,7 +17,7 @@ interface UserProfileScreenProps {
 
 export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(!profile?.name || !profile?.username || !profile?.birthday);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -114,6 +114,11 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
   };
 
   const handleSave = async () => {
+    if (!formData.name || !formData.username || !formData.birthday) {
+      alert("Name, username, and birthday are required");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const userRef = doc(db, 'users', user.uid);
@@ -213,7 +218,7 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
                 type="text" 
                 value={formData.name}
                 onChange={e => setFormData({ ...formData, name: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-[rgba(255,255,255,0.2)] focus:outline-none focus:border-accent transition-all font-light"
                 placeholder="Enter your name"
               />
             ) : (
@@ -230,7 +235,7 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
                 type="text" 
                 value={formData.username}
                 onChange={e => setFormData({ ...formData, username: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-[rgba(255,255,255,0.2)] focus:outline-none focus:border-accent transition-all font-light"
                 placeholder="@username"
               />
             ) : (
@@ -248,7 +253,7 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
                   type="date" 
                   value={formData.birthday}
                   onChange={e => setFormData({ ...formData, birthday: e.target.value })}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                  className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-[rgba(255,255,255,0.2)] focus:outline-none focus:border-accent transition-all font-light"
                 />
                 {formData.birthday && (
                   <div className="text-xl font-display text-white/60 w-20 text-center">
@@ -278,7 +283,7 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
                       language: country ? country.languages[0] : formData.language
                     });
                   }}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light appearance-none"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light appearance-none"
                 >
                   {COUNTRIES.map(c => (
                     <option key={c.code} value={c.code}>{c.name}</option>
@@ -297,7 +302,7 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
                 <select 
                   value={formData.language}
                   onChange={e => setFormData({ ...formData, language: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light appearance-none"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light appearance-none"
                 >
                   {(COUNTRIES.find(c => c.code === formData.country)?.languages || ['English']).map(lang => (
                     <option key={lang} value={lang}>{lang}</option>
@@ -345,7 +350,7 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
         {isEditing && (
           <button 
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || !formData.name || !formData.username || !formData.birthday}
             className="vonas-button vonas-button-primary w-full py-5"
           >
             {isSaving ? (

@@ -20,10 +20,10 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
   const [isEditing, setIsEditing] = useState(!profile?.is_setup_completed && profile?.weight_kg === undefined);
 
   const [formData, setFormData] = useState({
-    age: profile?.age || 30,
+    age: profile?.age || '',
     gender: profile?.gender || 'male',
-    weight_kg: profile?.weight_kg || 70,
-    height_cm: profile?.height_cm || 170,
+    weight_kg: profile?.weight_kg || '',
+    height_cm: profile?.height_cm || '',
     activity_level: profile?.activity_level || 'moderate',
     goal: profile?.goal || 'maintain',
   });
@@ -31,21 +31,27 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
   useEffect(() => {
     if (profile) {
       setFormData({
-        age: profile.age || 30,
+        age: profile.age || '',
         gender: profile.gender || 'male',
-        weight_kg: profile.weight_kg || 70,
-        height_cm: profile.height_cm || 170,
+        weight_kg: profile.weight_kg || '',
+        height_cm: profile.height_cm || '',
         activity_level: profile.activity_level || 'moderate',
         goal: profile.goal || 'maintain',
       });
     }
   }, [profile]);
 
-  const calculateMacros = (): DailyGoals & { bmr: number } => {
-    const { age, gender, weight_kg, height_cm, activity_level, goal } = formData;
+  const calculateMacros = (): DailyGoals & { bmr: number } | null => {
+    const age = Number(formData.age);
+    const weight_kg = Number(formData.weight_kg);
+    const height_cm = Number(formData.height_cm);
+    
+    if (!age || !weight_kg || !height_cm) return null;
+
+    const { gender, activity_level, goal } = formData;
     
     // Mifflin-St Jeor Equation
-    let bmr = 10 * (weight_kg || 70) + 6.25 * (height_cm || 170) - 5 * (age || 30);
+    let bmr = 10 * weight_kg + 6.25 * height_cm - 5 * age;
     bmr += gender === 'male' ? 5 : -161;
 
     const activityMultipliers = {
@@ -67,8 +73,8 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
     const calories = Math.round(tdee);
     
     // Macros: Protein 2g/kg, Fat 0.8g/kg, Carbs remainder
-    const protein_g = Math.round((weight_kg || 70) * 2);
-    const fat_g = Math.round((weight_kg || 70) * 0.8);
+    const protein_g = Math.round(weight_kg * 2);
+    const fat_g = Math.round(weight_kg * 0.8);
     
     const proteinCals = protein_g * 4;
     const fatCals = fat_g * 9;
@@ -80,13 +86,21 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
   };
 
   const handleSave = async () => {
+    const calculated = calculateMacros();
+    if (!calculated) {
+      alert("Please fill all required fields (Age, Weight, Height)");
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const calculated = calculateMacros();
       const userRef = doc(db, 'users', user.uid);
       
       await updateDoc(userRef, {
         ...formData,
+        age: Number(formData.age),
+        weight_kg: Number(formData.weight_kg),
+        height_cm: Number(formData.height_cm),
         daily_goals: {
           calories: calculated.calories,
           protein_g: calculated.protein_g,
@@ -108,7 +122,7 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
   };
 
   const bmi = formData.weight_kg && formData.height_cm 
-    ? (formData.weight_kg / Math.pow(formData.height_cm / 100, 2)).toFixed(1) 
+    ? (Number(formData.weight_kg) / Math.pow(Number(formData.height_cm) / 100, 2)).toFixed(1) 
     : '--';
 
   const getBmiStatus = (bmiValue: string) => {
@@ -168,12 +182,13 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
                 <input 
                   type="number" 
                   value={formData.age}
-                  onChange={e => setFormData({ ...formData, age: Number(e.target.value) })}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                  placeholder="e.g. 30"
+                  onChange={e => setFormData({ ...formData, age: e.target.value })}
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-[rgba(255,255,255,0.2)] focus:outline-none focus:border-accent transition-all font-light"
                 />
               ) : (
                 <div className="text-2xl font-display text-white">
-                  {formData.age} <span className="text-xs text-white/20 font-sans tracking-normal lowercase">yrs</span>
+                  {formData.age || '--'} <span className="text-xs text-white/20 font-sans tracking-normal lowercase">yrs</span>
                 </div>
               )}
             </div>
@@ -183,7 +198,7 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
                 <select 
                   value={formData.gender}
                   onChange={e => setFormData({ ...formData, gender: e.target.value as any })}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light appearance-none"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light appearance-none"
                 >
                   <option value="male">Male</option>
                   <option value="female">Female</option>
@@ -203,12 +218,13 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
                 <input 
                   type="number" 
                   value={formData.weight_kg}
-                  onChange={e => setFormData({ ...formData, weight_kg: Number(e.target.value) })}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                  placeholder="e.g. 70"
+                  onChange={e => setFormData({ ...formData, weight_kg: e.target.value })}
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-[rgba(255,255,255,0.2)] focus:outline-none focus:border-accent transition-all font-light"
                 />
               ) : (
                 <div className="text-2xl font-display text-white">
-                  {formData.weight_kg} <span className="text-xs text-white/20 font-sans tracking-normal lowercase">kg</span>
+                  {formData.weight_kg || '--'} <span className="text-xs text-white/20 font-sans tracking-normal lowercase">kg</span>
                 </div>
               )}
             </div>
@@ -218,12 +234,13 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
                 <input 
                   type="number" 
                   value={formData.height_cm}
-                  onChange={e => setFormData({ ...formData, height_cm: Number(e.target.value) })}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light"
+                  placeholder="e.g. 175"
+                  onChange={e => setFormData({ ...formData, height_cm: e.target.value })}
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-2xl px-6 py-4 text-white placeholder-[rgba(255,255,255,0.2)] focus:outline-none focus:border-accent transition-all font-light"
                 />
               ) : (
                 <div className="text-2xl font-display text-white">
-                  {formData.height_cm} <span className="text-xs text-white/20 font-sans tracking-normal lowercase">cm</span>
+                  {formData.height_cm || '--'} <span className="text-xs text-white/20 font-sans tracking-normal lowercase">cm</span>
                 </div>
               )}
             </div>
@@ -240,7 +257,7 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
               <select 
                 value={formData.activity_level}
                 onChange={e => setFormData({ ...formData, activity_level: e.target.value as any })}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light appearance-none"
+                className="w-full bg-[#0a0a0a] border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-accent transition-all font-light appearance-none"
               >
                 <option value="sedentary">Sedentary (Little to no exercise)</option>
                 <option value="light">Lightly Active (1-3 days/week)</option>
@@ -299,14 +316,14 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
           
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
             {[
-              { label: 'Kcal', value: isEditing ? previewMacros.calories : profile?.daily_goals?.calories || 0, color: 'text-accent' },
-              { label: 'Prot', value: isEditing ? previewMacros.protein_g : profile?.daily_goals?.protein_g || 0, color: 'text-blue-400' },
-              { label: 'Carb', value: isEditing ? previewMacros.carbs_g : profile?.daily_goals?.carbs_g || 0, color: 'text-amber-400' },
-              { label: 'Fat', value: isEditing ? previewMacros.fat_g : profile?.daily_goals?.fat_g || 0, color: 'text-violet-400' },
-              { label: 'Sug', value: isEditing ? previewMacros.sugar_g : profile?.daily_goals?.sugar_g || 0, color: 'text-pink-400' },
-              { label: 'Sod', value: isEditing ? previewMacros.sodium_mg : profile?.daily_goals?.sodium_mg || 0, color: 'text-orange-400' },
+              { label: 'Kcal', value: isEditing ? (previewMacros?.calories || '--') : profile?.daily_goals?.calories || 0, color: 'text-accent' },
+              { label: 'Prot', value: isEditing ? (previewMacros?.protein_g || '--') : profile?.daily_goals?.protein_g || 0, color: 'text-blue-400' },
+              { label: 'Carb', value: isEditing ? (previewMacros?.carbs_g || '--') : profile?.daily_goals?.carbs_g || 0, color: 'text-amber-400' },
+              { label: 'Fat', value: isEditing ? (previewMacros?.fat_g || '--') : profile?.daily_goals?.fat_g || 0, color: 'text-violet-400' },
+              { label: 'Sug', value: isEditing ? (previewMacros?.sugar_g || '--') : profile?.daily_goals?.sugar_g || 0, color: 'text-pink-400' },
+              { label: 'Sod', value: isEditing ? (previewMacros?.sodium_mg || '--') : profile?.daily_goals?.sodium_mg || 0, color: 'text-orange-400' },
             ].map((macro) => (
-              <div key={macro.label} className="bg-white/5 rounded-2xl p-4 border border-white/10 text-center group hover:border-white/20 transition-colors flex flex-col justify-center min-h-[80px]">
+              <div key={macro.label} className="bg-[#0a0a0a] rounded-2xl p-4 border border-white/10 text-center group hover:border-white/20 transition-colors flex flex-col justify-center min-h-[80px]">
                 <div className={cn("text-lg sm:text-xl font-display break-words leading-tight", macro.color)}>
                   {macro.value}
                 </div>
@@ -319,7 +336,7 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
         {isEditing && (
           <button 
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || !formData.age || !formData.weight_kg || !formData.height_cm}
             className="vonas-button vonas-button-primary w-full py-5 mt-8"
           >
             {isSaving ? (

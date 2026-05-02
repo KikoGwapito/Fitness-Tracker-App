@@ -118,9 +118,13 @@ export function Progress({ logs, profile }: ProgressProps) {
     if (totals.calories === 0) {
       messages.push({ type: 'info', text: "No meals logged today. Start tracking to see progress!" });
     } else if (totals.calories > goals.calories) {
-      messages.push({ type: 'warning', text: `Calorie limit exceeded by ${totals.calories - goals.calories} kcal.` });
+      messages.push({ type: 'warning', text: `Calorie limit exceeded by ${Math.round(totals.calories - goals.calories)} kcal.` });
     } else if (totals.calories >= goals.calories * 0.9) {
       messages.push({ type: 'success', text: "Perfect! You've hit your daily calorie target." });
+    }
+
+    if (totals.protein >= goals.protein_g * 0.9) {
+      messages.push({ type: 'success', text: "Protein successfully achieved!" });
     }
 
     if (totals.sugar > goals.sugar_g) {

@@ -25,8 +25,8 @@ export async function analyzeMeal(imagePart?: { inlineData: { data: string; mime
 
   let response;
   let lastError;
-  // Use flash-lite-preview as primary since it is the fastest for vision/text tasks
-  const modelsToTry = ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"];
+  // Use gemini-1.5-flash for the fastest possible text and vision processing
+  const modelsToTry = ["gemini-1.5-flash", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"];
 
   for (const modelName of modelsToTry) {
     let attempt = 0;
@@ -39,8 +39,6 @@ export async function analyzeMeal(imagePart?: { inlineData: { data: string; mime
           model: modelName,
           contents: { parts },
           config: {
-            // Minimize latency by using lower thinking level
-            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
             systemInstruction: `## ROLE
 Coach Gref, Elite Performance Nutritionist for G-Refine. High-precision macro tracking for athletes.
 
@@ -176,7 +174,7 @@ export async function chatWithAICoach(message: string, history: any[], profile: 
 
 User Message: "${message}"`;
   
-  const modelsToTry = ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"];
+  const modelsToTry = ["gemini-1.5-flash", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"];
   let response;
   let lastError;
 
@@ -192,7 +190,6 @@ User Message: "${message}"`;
         model: modelName,
         history: formattedHistory,
         config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           systemInstruction: `Your name is Coach Gref. You are an expert fitness and nutrition AI coach for the G-Refine app. 
 Your goal is to answer questions ONLY related to fitness, health, and nutrition.
 If the user asks about something unrelated, politely decline and steer the conversation back to health and fitness.
