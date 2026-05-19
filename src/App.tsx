@@ -99,7 +99,8 @@ export default function App() {
     data: any;
     isConfirmed?: boolean;
   } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const [loggingDate, setLoggingDate] = useState<Date | null>(null);
   const [showForgotMealPrompt, setShowForgotMealPrompt] = useState(false);
@@ -276,7 +277,7 @@ export default function App() {
     { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, sugar_g: 0, sodium_mg: 0 }
   );
 
-  const handleImageSelect = async (e?: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e?: React.ChangeEvent<HTMLInputElement>, source: 'camera' | 'gallery' = 'camera') => {
     if (Capacitor.isNativePlatform()) {
       try {
         const image = await Camera.getPhoto({
@@ -284,7 +285,7 @@ export default function App() {
           width: 600,
           allowEditing: false,
           resultType: CameraResultType.DataUrl,
-          source: CameraSource.Prompt
+          source: source === 'camera' ? CameraSource.Camera : CameraSource.Photos
         });
         
         if (image.dataUrl) {
@@ -296,8 +297,11 @@ export default function App() {
       }
     } else {
       if (!e) {
-        // If called without event, trigger the hidden file input
-        fileInputRef.current?.click();
+        if (source === 'camera') {
+          cameraInputRef.current?.click();
+        } else {
+          galleryInputRef.current?.click();
+        }
         return;
       }
       
@@ -1080,36 +1084,68 @@ export default function App() {
                   <>
                     {/* Image Upload Area */}
                     <div 
-                      onClick={() => handleImageSelect()}
                       className={cn(
-                        "relative w-full aspect-square rounded-3xl border-2 border-dashed flex flex-col items-center justify-center overflow-hidden cursor-pointer transition-all duration-500",
-                        selectedImage ? "border-accent/50 bg-white/5" : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
+                        "relative w-full aspect-square rounded-3xl border-2 border-dashed flex flex-col items-center justify-center overflow-hidden transition-all duration-500",
+                        selectedImage ? "border-accent/50 bg-white/5 cursor-pointer" : "border-white/10 bg-white/5"
                       )}
+                      onClick={() => {
+                        if (selectedImage) handleImageSelect(undefined, 'gallery');
+                      }}
                     >
                       {selectedImage ? (
                         <>
                           <img src={selectedImage} alt="Selected meal" className="absolute inset-0 w-full h-full object-cover opacity-80" />
                           <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent" />
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setSelectedImage(null); }}
+                            className="absolute top-4 right-4 z-20 w-8 h-8 bg-bg/80 border border-white/10 rounded-full flex items-center justify-center text-white/50 hover:text-white"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                           <div className="relative z-10 flex items-center gap-2 bg-bg/80 px-6 py-3 rounded-full backdrop-blur-xl border border-white/10">
                             <ImageIcon className="w-4 h-4 text-accent" />
                             <span className="text-xs font-display uppercase tracking-wider">Change Photo</span>
                           </div>
                         </>
                       ) : (
-                        <>
-                          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10">
-                            <CameraIcon className="w-8 h-8 text-ink/40" />
-                          </div>
-                          <p className="text-xs font-display uppercase tracking-widest text-white">Tap to snap</p>
-                          <p className="text-[10px] text-ink/40 mt-2 uppercase tracking-tighter">Or upload from gallery</p>
-                        </>
+                        <div className="flex w-full h-full">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleImageSelect(undefined, 'camera'); }}
+                            className="flex-1 flex flex-col items-center justify-center border-r border-dashed border-white/10 hover:bg-white/10 transition-colors"
+                          >
+                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10">
+                              <CameraIcon className="w-8 h-8 text-ink/40" />
+                            </div>
+                            <p className="text-xs font-display uppercase tracking-widest text-white">Camera</p>
+                            <p className="text-[10px] text-ink/40 mt-1 uppercase tracking-tighter">Take photo</p>
+                          </button>
+
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleImageSelect(undefined, 'gallery'); }}
+                            className="flex-1 flex flex-col items-center justify-center hover:bg-white/10 transition-colors"
+                          >
+                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10">
+                              <ImageIcon className="w-8 h-8 text-ink/40" />
+                            </div>
+                            <p className="text-xs font-display uppercase tracking-widest text-white">Gallery</p>
+                            <p className="text-[10px] text-ink/40 mt-1 uppercase tracking-tighter">Upload</p>
+                          </button>
+                        </div>
                       )}
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden" 
+                        ref={cameraInputRef}
+                        onChange={(e) => handleImageSelect(e, 'camera')}
+                      />
                       <input 
                         type="file" 
                         accept="image/*" 
                         className="hidden" 
-                        ref={fileInputRef}
-                        onChange={(e) => handleImageSelect(e)}
+                        ref={galleryInputRef}
+                        onChange={(e) => handleImageSelect(e, 'gallery')}
                       />
                     </div>
 
