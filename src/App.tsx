@@ -1107,7 +1107,6 @@ export default function App() {
                       <input 
                         type="file" 
                         accept="image/*" 
-                        capture="environment"
                         className="hidden" 
                         ref={fileInputRef}
                         onChange={(e) => handleImageSelect(e)}
