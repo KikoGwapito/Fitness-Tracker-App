@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import heic2any from 'heic2any';
 import { UserProfile } from '../types';
 import { User } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -58,9 +59,19 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
     }
   }, [profile]);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    let processFile = file;
+    if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.hevc') || file.type === 'image/heic' || file.type === 'image/hevc') {
+      try {
+        const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg" }) as Blob;
+        processFile = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg'), { type: "image/jpeg" });
+      } catch (err) {
+        console.error("HEIC conversion failed:", err);
+      }
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -94,7 +105,7 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
       };
       img.src = event.target?.result as string;
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(processFile);
   };
 
   const handleDeletePicture = () => {
@@ -204,7 +215,7 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
             type="file" 
             ref={fileInputRef} 
             onChange={handleImageSelect} 
-            accept="image/*" 
+            accept="image/*,.heic,.hevc" 
             className="hidden" 
           />
         </div>

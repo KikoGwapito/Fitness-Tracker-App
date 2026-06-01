@@ -23,6 +23,7 @@ import { AICoachModal } from './components/AICoachModal';
 import { useNotifications } from './lib/useNotifications';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
+import heic2any from 'heic2any';
 
 const DEFAULT_GOALS: DailyGoals = {
   calories: 2200,
@@ -309,6 +310,17 @@ export default function App() {
       if (!file) return;
 
       setImageMimeType('image/jpeg'); // We will force it to jpeg during compression
+      
+      let processFile = file;
+      if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.hevc') || file.type === 'image/heic' || file.type === 'image/hevc') {
+        try {
+          const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg" }) as Blob;
+          processFile = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg'), { type: "image/jpeg" });
+        } catch (err) {
+          console.error("HEIC conversion failed:", err);
+        }
+      }
+
       const reader = new FileReader();
       reader.onloadend = async () => {
         try {
@@ -319,7 +331,7 @@ export default function App() {
           setSelectedImage(reader.result as string); // Fallback to original
         }
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(processFile);
     }
   };
 
@@ -1134,7 +1146,7 @@ export default function App() {
                       )}
                       <input 
                         type="file" 
-                        accept="image/*"
+                        accept="image/*,.heic,.hevc"
                         capture="environment"
                         className="hidden" 
                         ref={cameraInputRef}
@@ -1142,7 +1154,7 @@ export default function App() {
                       />
                       <input 
                         type="file" 
-                        accept="image/*" 
+                        accept="image/*,.heic,.hevc" 
                         className="hidden" 
                         ref={galleryInputRef}
                         onChange={(e) => handleImageSelect(e, 'gallery')}

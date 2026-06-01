@@ -25,8 +25,8 @@ export async function analyzeMeal(imagePart?: { inlineData: { data: string; mime
 
   let response;
   let lastError;
-  // Use gemini-1.5-flash for the fastest possible text and vision processing
-  const modelsToTry = ["gemini-1.5-flash", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"];
+  // Use gemini-3.5-flash for the fastest possible text and vision processing
+  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-pro-preview"];
 
   for (const modelName of modelsToTry) {
     let attempt = 0;
@@ -174,7 +174,7 @@ export async function chatWithAICoach(message: string, history: any[], profile: 
 
 User Message: "${message}"`;
   
-  const modelsToTry = ["gemini-1.5-flash", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"];
+  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-pro-preview"];
   let response;
   let lastError;
 

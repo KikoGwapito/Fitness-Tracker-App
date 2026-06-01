@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">G-Refine</string>
+    <string name="title_activity_main">G-Refine</string>
+    <string name="package_name">com.grefine.app</string>
+    <string name="custom_url_scheme">com.grefine.app</string>
+</resources>
