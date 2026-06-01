@@ -24,6 +24,7 @@ import { useNotifications } from './lib/useNotifications';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 import heic2any from 'heic2any';
+import { Toaster, toast } from 'react-hot-toast';
 
 const DEFAULT_GOALS: DailyGoals = {
   calories: 2200,
@@ -245,8 +246,10 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-    } catch (error) {
+      toast.success('Logged out successfully');
+    } catch (error: any) {
       console.error('Logout failed:', error);
+      toast.error('Logout failed: ' + error.message);
     }
   };
 
@@ -351,8 +354,10 @@ export default function App() {
             await firebaseService.deleteMealFromFirebase(user.uid, logId);
           }
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        } catch (error) {
+          toast.success('Meal deleted successfully');
+        } catch (error: any) {
           console.error('Delete failed:', error);
+          toast.error('Failed to delete meal: ' + error.message);
         }
       }
     });
@@ -380,7 +385,10 @@ export default function App() {
   };
 
   const handleAnalyze = async () => {
-    if (!textInput && !selectedImage && !editingLog) return;
+    if (!textInput && !selectedImage && !editingLog) {
+      toast.error('Please provide an image or description of your meal.');
+      return;
+    }
     
     if (editingLog) {
       setConfirmModal({
@@ -426,7 +434,7 @@ export default function App() {
       const result = await analyzeMeal(imagePart, prompt);
       
       if (result.status === 'error') {
-        alert(`Analysis Error: ${result.message}`);
+        toast.error(`Analysis Error: ${result.message}`);
         setIsAnalyzing(false);
         return;
       }
@@ -451,7 +459,7 @@ export default function App() {
       await saveConfirmedMeal(result, finalImageUrl, false);
     } catch (error: any) {
       console.error('Analysis failed:', error);
-      alert(`Failed to analyze meal: ${error.message || 'Unknown error'}. Please try again.`);
+      toast.error(`Failed to analyze meal: ${error.message || 'Unknown error'}. Please try again.`);
     } finally {
       setIsAnalyzing(false);
     }
@@ -522,6 +530,8 @@ export default function App() {
         }, result.status === 'confirmed', loggingDate || undefined);
       }
 
+      toast.success(editingLog ? (editingMode === 'favorite' ? 'Favorite updated successfully!' : 'Meal updated successfully!') : 'Meal logged successfully!');
+
       setIsLogging(false);
       setLoggingDate(null);
       setEditingLog(null);
@@ -532,7 +542,7 @@ export default function App() {
       setImageMimeType(null);
     } catch (error: any) {
       console.error('Failed to save meal:', error);
-      alert(`Failed to save meal: ${error.message || 'Unknown error'}. Please try again.`);
+      toast.error(`Failed to save meal: ${error.message || 'Unknown error'}. Please try again.`);
     }
   };
 
@@ -572,9 +582,10 @@ export default function App() {
       // Navigate back to dashboard to see the logged meal
       setSubPage('none');
       setActiveTab('dashboard');
+      toast.success('Favorite meal logged for today!');
     } catch (error: any) {
       console.error('Failed to log favorite meal:', error);
-      alert(`Failed to log meal: ${error.message || 'Unknown error'}. Please try again.`);
+      toast.error(`Failed to log meal: ${error.message || 'Unknown error'}. Please try again.`);
     }
   };
 
@@ -591,8 +602,10 @@ export default function App() {
         firebaseService.updateMealInFirebase(user.uid, l.id, { isPinned: !currentPinnedStatus })
       );
       await Promise.all(updatePromises);
-    } catch (error) {
+      toast.success(currentPinnedStatus ? 'Removed from favorites' : 'Added to favorites');
+    } catch (error: any) {
       console.error('Failed to toggle favorite:', error);
+      toast.error(`Failed to update favorite: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -614,6 +627,7 @@ export default function App() {
         >
           <Activity className="w-12 h-12 text-accent" />
         </motion.div>
+        <Toaster position="top-center" toastOptions={{ className: 'bg-white/10 text-white border border-white/20 backdrop-blur-md' }} />
         <h1 className="text-6xl md:text-8xl font-display uppercase leading-none mb-4 animate-slam">
           G-<span className="text-stroke">Refine</span>
         </h1>
@@ -633,6 +647,7 @@ export default function App() {
 
   return (
     <div className="fixed inset-0 bg-bg text-ink font-sans selection:bg-accent/30 flex justify-center">
+      <Toaster position="top-center" toastOptions={{ className: 'bg-[#151515] text-white border border-white/20 backdrop-blur-md', duration: 4000 }} />
       {/* Main container */}
       <div className="w-full h-[100dvh] flex flex-col md:flex-row relative bg-bg overflow-hidden">
         

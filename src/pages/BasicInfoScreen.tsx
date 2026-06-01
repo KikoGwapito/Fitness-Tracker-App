@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { UserProfile, DailyGoals } from '../types';
 import { User } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -88,7 +89,7 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
   const handleSave = async () => {
     const calculated = calculateMacros();
     if (!calculated) {
-      alert("Please fill all required fields (Age, Weight, Height)");
+      toast.error("Please fill all required fields (Age, Weight, Height)");
       return;
     }
 
@@ -114,7 +115,9 @@ export function BasicInfoScreen({ user, profile, onBack }: BasicInfoScreenProps)
       });
       
       setIsEditing(false);
-    } catch (error) {
+      toast.success("Basic info saved successfully");
+    } catch (error: any) {
+      toast.error("Failed to save basic info");
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
     } finally {
       setIsSaving(false);

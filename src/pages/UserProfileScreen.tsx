@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import heic2any from 'heic2any';
+import { toast } from 'react-hot-toast';
 import { UserProfile } from '../types';
 import { User } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -126,7 +127,7 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
 
   const handleSave = async () => {
     if (!formData.name || !formData.username || !formData.birthday) {
-      alert("Name, username, and birthday are required");
+      toast.error("Name, username, and birthday are required");
       return;
     }
 
@@ -150,7 +151,9 @@ export function UserProfileScreen({ user, profile, onBack }: UserProfileScreenPr
 
       await updateDoc(userRef, updateData);
       setIsEditing(false);
-    } catch (error) {
+      toast.success("Profile saved successfully");
+    } catch (error: any) {
+      toast.error("Failed to save profile");
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
     } finally {
       setIsSaving(false);
