@@ -1,4 +1,5 @@
 import { auth } from '../firebase';
+import { toast } from 'react-hot-toast';
 
 export enum OperationType {
   CREATE = 'create',
@@ -28,7 +29,7 @@ export interface FirestoreErrorInfo {
   }
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): Error {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -47,6 +48,17 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.error('Firestore Error: \n' + JSON.stringify(errInfo));
+  
+  if (errInfo.error.includes("Quota limit exceeded")) {
+    const errorMsg = "Database free daily quota exceeded. Please try again tomorrow.";
+    // Prevent spamming the toast for the same error since multiple snapshot listeners might fail at once
+    if (!(window as any).__quotaErrorShown) {
+      toast.error(errorMsg, { duration: 10000 });
+      (window as any).__quotaErrorShown = true;
+    }
+    return new Error(errorMsg);
+  }
+  
+  return error instanceof Error ? error : new Error(String(error));
 }

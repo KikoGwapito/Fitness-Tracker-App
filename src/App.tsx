@@ -42,6 +42,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [subPage, setSubPage] = useState<'none' | 'profile' | 'basic-info' | 'app-info' | 'favorites'>('none');
   const [logs, setLogs] = useState<FoodLog[]>([]);
+  const [logLimit, setLogLimit] = useState<number>(30);
   const [schedules, setSchedules] = useState<Record<string, string>>({});
 
   // Initialize notifications
@@ -102,7 +103,6 @@ export default function App() {
     isConfirmed?: boolean;
   } | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const [loggingDate, setLoggingDate] = useState<Date | null>(null);
   const [showForgotMealPrompt, setShowForgotMealPrompt] = useState(false);
@@ -200,7 +200,11 @@ export default function App() {
       setIsAuthReady(true);
 
       if (currentUser) {
-        await firebaseService.ensureUserProfile(currentUser, DEFAULT_GOALS);
+        try {
+          await firebaseService.ensureUserProfile(currentUser, DEFAULT_GOALS);
+        } catch (error) {
+          console.error("Failed to ensure user profile:", error);
+        }
       }
     });
     return () => unsubscribe();
@@ -218,7 +222,7 @@ export default function App() {
     const profileUnsubscribe = firebaseService.subscribeToProfile(user.uid, setProfile);
 
     // Logs listener
-    const logsUnsubscribe = firebaseService.subscribeToMeals(user.uid, setLogs);
+    const logsUnsubscribe = firebaseService.subscribeToMeals(user.uid, setLogs, logLimit);
 
     // Schedules listener
     const schedulesUnsubscribe = firebaseService.subscribeToSchedules(user.uid, setSchedules);
@@ -228,7 +232,7 @@ export default function App() {
       logsUnsubscribe();
       schedulesUnsubscribe();
     };
-  }, [user, isAuthReady]);
+  }, [user, isAuthReady, logLimit]);
 
   const handleLogin = async () => {
     try {
@@ -303,8 +307,6 @@ export default function App() {
       if (!e) {
         if (source === 'camera') {
           cameraInputRef.current?.click();
-        } else {
-          galleryInputRef.current?.click();
         }
         return;
       }
@@ -381,6 +383,7 @@ export default function App() {
     setEditingLog(log);
     setEditingMode(mode);
     setTextInput(log.foodName);
+    setLoggingDate(null);
     setIsLogging(true);
   };
 
@@ -577,12 +580,13 @@ export default function App() {
       await firebaseService.saveMealToFirebase(user.uid, {
         ...mealData,
         image_url: log.image_url
-      }, true);
+      }, true, loggingDate || undefined);
       
       // Navigate back to dashboard to see the logged meal
       setSubPage('none');
       setActiveTab('dashboard');
-      toast.success('Favorite meal logged for today!');
+      toast.success(loggingDate ? `Favorite meal logged for ${loggingDate.toLocaleDateString()}!` : 'Favorite meal logged for today!');
+      setLoggingDate(null);
     } catch (error: any) {
       console.error('Failed to log favorite meal:', error);
       toast.error(`Failed to log meal: ${error.message || 'Unknown error'}. Please try again.`);
@@ -804,6 +808,7 @@ export default function App() {
             setEditingLog(null);
             setTextInput('');
             setSelectedImage(null);
+            setLoggingDate(null);
             setIsLogging(true);
           }} 
         />
@@ -845,6 +850,7 @@ export default function App() {
                 profile={profile} 
                 onToggleFavorite={handleToggleFavorite}
                 schedules={schedules}
+                onLoadMore={() => setLogLimit(prev => prev + 50)}
                 onSaveSchedule={(date, text) => {
                   if (user) {
                     firebaseService.saveSchedule(user.uid, date, text);
@@ -1138,24 +1144,13 @@ export default function App() {
                         <div className="flex w-full h-full">
                           <button
                             onClick={(e) => { e.stopPropagation(); handleImageSelect(undefined, 'camera'); }}
-                            className="flex-1 flex flex-col items-center justify-center border-r border-dashed border-white/10 hover:bg-white/10 transition-colors"
+                            className="flex-1 flex flex-col items-center justify-center hover:bg-white/10 transition-colors"
                           >
                             <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10">
                               <CameraIcon className="w-8 h-8 text-ink/40" />
                             </div>
                             <p className="text-xs font-display uppercase tracking-widest text-white">Camera</p>
                             <p className="text-[10px] text-ink/40 mt-1 uppercase tracking-tighter">Take photo</p>
-                          </button>
-
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleImageSelect(undefined, 'gallery'); }}
-                            className="flex-1 flex flex-col items-center justify-center hover:bg-white/10 transition-colors"
-                          >
-                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10">
-                              <ImageIcon className="w-8 h-8 text-ink/40" />
-                            </div>
-                            <p className="text-xs font-display uppercase tracking-widest text-white">Gallery</p>
-                            <p className="text-[10px] text-ink/40 mt-1 uppercase tracking-tighter">Upload</p>
                           </button>
                         </div>
                       )}
@@ -1166,13 +1161,6 @@ export default function App() {
                         className="hidden" 
                         ref={cameraInputRef}
                         onChange={(e) => handleImageSelect(e, 'camera')}
-                      />
-                      <input 
-                        type="file" 
-                        accept="image/*,.heic,.hevc" 
-                        className="hidden" 
-                        ref={galleryInputRef}
-                        onChange={(e) => handleImageSelect(e, 'gallery')}
                       />
                     </div>
 
@@ -1212,7 +1200,6 @@ export default function App() {
                         <button 
                           onClick={() => {
                             setIsLogging(false);
-                            setLoggingDate(null);
                             setActiveTab('menu');
                             setSubPage('favorites');
                           }}

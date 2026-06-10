@@ -15,7 +15,8 @@ import {
   deleteDoc,
   updateDoc,
   getDoc,
-  setDoc
+  setDoc,
+  limit
 } from 'firebase/firestore';
 import { FoodLog, UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
@@ -81,12 +82,10 @@ class FirebaseService {
         try {
           return await addDoc(logRef, data);
         } catch (innerError) {
-          handleFirestoreError(innerError, OperationType.CREATE, `users/${uid}/food_logs`);
-          throw innerError;
+          throw handleFirestoreError(innerError, OperationType.CREATE, `users/${uid}/food_logs`);
         }
       }
-      handleFirestoreError(error, OperationType.CREATE, `users/${uid}/food_logs`);
-      throw error;
+      throw handleFirestoreError(error, OperationType.CREATE, `users/${uid}/food_logs`);
     }
   }
 
@@ -132,12 +131,10 @@ class FirebaseService {
           await updateDoc(logRef, data);
           return;
         } catch (innerError) {
-          handleFirestoreError(innerError, OperationType.UPDATE, `users/${uid}/food_logs/${logId}`);
-          throw innerError;
+          throw handleFirestoreError(innerError, OperationType.UPDATE, `users/${uid}/food_logs/${logId}`);
         }
       }
-      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}/food_logs/${logId}`);
-      throw error;
+      throw handleFirestoreError(error, OperationType.UPDATE, `users/${uid}/food_logs/${logId}`);
     }
   }
 
@@ -145,17 +142,17 @@ class FirebaseService {
     try {
       await deleteDoc(doc(db, `users/${uid}/food_logs`, logId));
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `users/${uid}/food_logs/${logId}`);
-      throw error;
+      throw handleFirestoreError(error, OperationType.DELETE, `users/${uid}/food_logs/${logId}`);
     }
   }
 
   // Activities removed
 
-  subscribeToMeals(uid: string, callback: (logs: FoodLog[]) => void) {
+  subscribeToMeals(uid: string, callback: (logs: FoodLog[]) => void, logLimit: number = 100) {
     const q = query(
       collection(db, `users/${uid}/food_logs`),
-      orderBy('timestamp', 'desc')
+      orderBy('timestamp', 'desc'),
+      limit(logLimit)
     );
 
     return onSnapshot(q, (snapshot) => {
@@ -205,7 +202,7 @@ class FirebaseService {
         });
       }
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}`);
+      throw handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}`);
     }
   }
 
@@ -224,7 +221,7 @@ class FirebaseService {
       const userRef = doc(db, 'users', uid);
       await updateDoc(userRef, { settings });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+      throw handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
     }
   }
 
@@ -238,7 +235,7 @@ class FirebaseService {
         createdAt: Date.now()
       });
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `users/${uid}/schedules`);
+      throw handleFirestoreError(error, OperationType.CREATE, `users/${uid}/schedules`);
     }
   }
 

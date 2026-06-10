@@ -18,9 +18,10 @@ interface HistoryProps {
   schedules?: Record<string, string>;
   onSaveSchedule?: (date: string, text: string) => void;
   onLogForDate?: (date: Date) => void;
+  onLoadMore?: () => void;
 }
 
-export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorite, schedules = {}, onSaveSchedule, onLogForDate }: HistoryProps) {
+export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorite, schedules = {}, onSaveSchedule, onLogForDate, onLoadMore }: HistoryProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isMealsOpen, setIsMealsOpen] = useState(false);
@@ -472,6 +473,17 @@ export function History({ logs, onEditLog, onDeleteLog, profile, onToggleFavorit
             )}
           </AnimatePresence>
         </div>
+
+        {onLoadMore && (
+          <div className="flex justify-center pb-8 pt-4">
+            <button 
+              onClick={onLoadMore}
+              className="px-6 py-3 border border-white/10 hover:border-white/30 hover:bg-white/5 rounded-full text-xs font-display uppercase tracking-widest text-white/60 transition-colors"
+            >
+               Load More Past Logs
+            </button>
+          </div>
+        )}
       </div>
 
       <ScheduleModal

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Flame, Beef, Droplets, MessageSquare, Trash2, Edit2, Star, CalendarHeart, Sparkles } from 'lucide-react';
+import { Activity, Flame, Beef, Droplets, MessageSquare, Trash2, Edit2, Star, CalendarHeart, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'motion/react';
-import { MacroRing } from '../components/MacroRing';
+import { ConcentricMacroRings, RingData } from '../components/ConcentricMacroRings';
 import { FoodLog, DailyGoals, UserProfile } from '../types';
 import { cn } from '../lib/utils';
 import { User } from 'firebase/auth';
@@ -21,6 +21,7 @@ interface DashboardProps {
 
 export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggleFavorite, schedules = {} }: DashboardProps) {
   const [selectedMeal, setSelectedMeal] = useState<FoodLog | null>(null);
+  const [activeMacroIndex, setActiveMacroIndex] = useState(0);
   const { holidays } = useHolidays(profile?.country, new Date().getFullYear());
 
   useEffect(() => {
@@ -203,67 +204,59 @@ export function Dashboard({ user, profile, logs, onDeleteLog, onEditLog, onToggl
       {/* Hero Stats - Full No Scroll Side */}
       <section className="space-y-8">
         <div className="relative flex flex-col items-center">
-          <MacroRing 
-            value={Math.max(0, currentTotals.calories)} 
-            max={goals.calories} 
-            color="var(--c-accent)" 
-            label="Net Calories" 
-            size={240} 
-            strokeWidth={16}
-          />
-          <div className="mt-6 text-center">
-            <div className="text-[10px] font-display uppercase tracking-widest text-white/40 mb-1">Remaining</div>
-            <div className={cn(
-              "text-4xl font-display uppercase",
-              currentTotals.calories > goals.calories ? "text-danger" : "text-white"
-            )}>
-              {Math.max(0, goals.calories - currentTotals.calories)} <span className="text-sm opacity-40">kcal</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex flex-wrap justify-center gap-4 md:gap-8">
-          <MacroRing 
-            value={currentTotals.protein_g} 
-            max={goals.protein_g} 
-            color="#3b82f6" 
-            label="Protein" 
-            size={90} 
-            strokeWidth={6}
-          />
-          <MacroRing 
-            value={currentTotals.carbs_g} 
-            max={goals.carbs_g} 
-            color="#f59e0b" 
-            label="Carbs" 
-            size={90} 
-            strokeWidth={6}
-          />
-          <MacroRing 
-            value={currentTotals.fat_g} 
-            max={goals.fat_g} 
-            color="#8b5cf6" 
-            label="Fat" 
-            size={90} 
-            strokeWidth={6}
-          />
-          <MacroRing 
-            value={currentTotals.sugar_g} 
-            max={goals.sugar_g} 
-            color="#ec4899" 
-            label="Sugar" 
-            size={90} 
-            strokeWidth={6}
-          />
-          <MacroRing 
-            value={currentTotals.sodium_mg} 
-            max={goals.sodium_mg} 
-            color="#10b981" 
-            label="Sodium" 
-            size={90} 
-            strokeWidth={6}
-            unit="mg"
-          />
+          {(() => {
+            const macroData = [
+              { label: 'Net Calories', current: currentTotals.calories, max: goals.calories, color: 'var(--c-accent)', textColor: 'text-accent', unit: 'kcal' },
+              { label: 'Protein', current: currentTotals.protein_g, max: goals.protein_g, color: '#3b82f6', textColor: 'text-blue-400', unit: 'g' },
+              { label: 'Carbs', current: currentTotals.carbs_g, max: goals.carbs_g, color: '#f59e0b', textColor: 'text-amber-400', unit: 'g' },
+              { label: 'Fat', current: currentTotals.fat_g, max: goals.fat_g, color: '#8b5cf6', textColor: 'text-violet-400', unit: 'g' },
+              { label: 'Sugar', current: currentTotals.sugar_g, max: goals.sugar_g, color: '#ec4899', textColor: 'text-pink-400', unit: 'g' },
+              { label: 'Sodium', current: currentTotals.sodium_mg, max: goals.sodium_mg, color: '#10b981', textColor: 'text-emerald-400', unit: 'mg' },
+            ];
+
+            const activeMacro = macroData[activeMacroIndex];
+            const isOverLimit = activeMacro.current > activeMacro.max;
+            const remaining = Math.max(0, activeMacro.max - activeMacro.current);
+
+            return (
+              <ConcentricMacroRings
+                size={320}
+                strokeWidth={10}
+                gap={6}
+                rings={macroData.map(m => ({
+                  label: m.label,
+                  value: m.current,
+                  max: m.max,
+                  color: m.color,
+                  unit: m.unit !== 'kcal' && m.unit !== 'g' ? m.unit : undefined
+                }))}
+                centerContent={
+                  <div className="text-center bg-bg/80 backdrop-blur-sm rounded-full w-32 h-32 flex flex-col items-center justify-center border border-white/5 shadow-2xl relative select-none">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setActiveMacroIndex((prev) => (prev - 1 + macroData.length) % macroData.length); }}
+                      className="absolute left-1 p-1 text-white/40 hover:text-white transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setActiveMacroIndex((prev) => (prev + 1) % macroData.length); }}
+                      className="absolute right-1 p-1 text-white/40 hover:text-white transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+
+                    <div className="text-[9px] font-display uppercase tracking-widest text-white/40 mb-1">{activeMacro.label}</div>
+                    <div className={cn(
+                      "text-2xl font-display uppercase font-bold",
+                      isOverLimit ? "text-danger" : activeMacro.textColor
+                    )}>
+                      {remaining} <span className="text-xs opacity-50 block mt-0.5">{activeMacro.unit} left</span>
+                    </div>
+                  </div>
+                }
+              />
+            );
+          })()}
         </div>
 
         {/* Daily Targets Summary */}
