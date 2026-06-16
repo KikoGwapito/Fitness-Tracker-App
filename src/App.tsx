@@ -23,6 +23,7 @@ import { AICoachModal } from './components/AICoachModal';
 import { useNotifications } from './lib/useNotifications';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
+import heic2any from 'heic2any';
 import { Toaster, toast } from 'react-hot-toast';
 
 const DEFAULT_GOALS: DailyGoals = {
@@ -319,6 +320,15 @@ export default function App() {
       setImageMimeType('image/jpeg'); // We will force it to jpeg during compression
       
       let processFile = file;
+
+      if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.hevc') || file.type === 'image/heic' || file.type === 'image/hevc') {
+        try {
+          const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg" }) as Blob;
+          processFile = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg'), { type: "image/jpeg" });
+        } catch (err) {
+          console.error("HEIC conversion failed:", err);
+        }
+      }
 
       try {
         const compressedDataUrl = await compressImageFile(processFile, 600, 0.6);
@@ -1158,7 +1168,7 @@ export default function App() {
                       )}
                       <input 
                         type="file" 
-                        accept="image/*"
+                        accept="image/*,.heic,.hevc"
                         capture="environment"
                         className="hidden" 
                         ref={cameraInputRef}
@@ -1166,7 +1176,7 @@ export default function App() {
                       />
                       <input 
                         type="file" 
-                        accept="image/*"
+                        accept="image/*,.heic,.hevc"
                         className="hidden" 
                         ref={galleryInputRef}
                         onChange={(e) => handleImageSelect(e, 'gallery')}
