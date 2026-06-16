@@ -3,7 +3,7 @@ import { Camera as CameraIcon, Plus, Activity, Flame, Droplets, Beef, X, Loader2
 import { analyzeMeal } from './lib/gemini';
 import { FoodLog, DailyGoals, UserProfile, UserSettings } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, compressImage } from './lib/utils';
+import { cn, compressImage, compressImageFile } from './lib/utils';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -23,7 +23,6 @@ import { AICoachModal } from './components/AICoachModal';
 import { useNotifications } from './lib/useNotifications';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
-import heic2any from 'heic2any';
 import { Toaster, toast } from 'react-hot-toast';
 
 const DEFAULT_GOALS: DailyGoals = {
@@ -103,6 +102,7 @@ export default function App() {
     isConfirmed?: boolean;
   } | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const [loggingDate, setLoggingDate] = useState<Date | null>(null);
   const [showForgotMealPrompt, setShowForgotMealPrompt] = useState(false);
@@ -307,6 +307,8 @@ export default function App() {
       if (!e) {
         if (source === 'camera') {
           cameraInputRef.current?.click();
+        } else if (source === 'gallery') {
+          galleryInputRef.current?.click();
         }
         return;
       }
@@ -317,26 +319,17 @@ export default function App() {
       setImageMimeType('image/jpeg'); // We will force it to jpeg during compression
       
       let processFile = file;
-      if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.hevc') || file.type === 'image/heic' || file.type === 'image/hevc') {
-        try {
-          const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg" }) as Blob;
-          processFile = new File([convertedBlob], file.name.replace(/\.heic$/i, '.jpg'), { type: "image/jpeg" });
-        } catch (err) {
-          console.error("HEIC conversion failed:", err);
-        }
-      }
 
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        try {
-          const compressedDataUrl = await compressImage(reader.result as string, 600, 0.6);
-          setSelectedImage(compressedDataUrl);
-        } catch (err) {
-          console.error("Failed to compress image immediately:", err);
-          setSelectedImage(reader.result as string); // Fallback to original
-        }
-      };
-      reader.readAsDataURL(processFile);
+      try {
+        const compressedDataUrl = await compressImageFile(processFile, 600, 0.6);
+        setSelectedImage(compressedDataUrl);
+      } catch (err) {
+        console.error("Failed to compress image immediately:", err);
+        // Fallback: If object URL compression fails, try FileReader
+        const reader = new FileReader();
+        reader.onloadend = () => setSelectedImage(reader.result as string);
+        reader.readAsDataURL(processFile);
+      }
     }
   };
 
@@ -1141,26 +1134,42 @@ export default function App() {
                           </div>
                         </>
                       ) : (
-                        <div className="flex w-full h-full">
+                        <div className="flex w-full h-full divide-x divide-white/10">
                           <button
                             onClick={(e) => { e.stopPropagation(); handleImageSelect(undefined, 'camera'); }}
-                            className="flex-1 flex flex-col items-center justify-center hover:bg-white/10 transition-colors"
+                            className="flex-1 flex flex-col items-center justify-center hover:bg-white/10 transition-colors group"
                           >
-                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/10">
-                              <CameraIcon className="w-8 h-8 text-ink/40" />
+                            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3 border border-white/10 group-hover:bg-accent/20 group-hover:text-accent group-hover:border-accent/30 transition-all">
+                              <CameraIcon className="w-6 h-6 text-ink/40 group-hover:text-accent transition-colors" />
                             </div>
-                            <p className="text-xs font-display uppercase tracking-widest text-white">Camera</p>
-                            <p className="text-[10px] text-ink/40 mt-1 uppercase tracking-tighter">Take photo</p>
+                            <p className="text-[10px] font-display uppercase tracking-widest text-white/60 group-hover:text-white transition-colors">Camera</p>
+                          </button>
+                          
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleImageSelect(undefined, 'gallery'); }}
+                            className="flex-1 flex flex-col items-center justify-center hover:bg-white/10 transition-colors group"
+                          >
+                            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3 border border-white/10 group-hover:bg-accent/20 group-hover:text-accent group-hover:border-accent/30 transition-all">
+                              <ImageIcon className="w-6 h-6 text-ink/40 group-hover:text-accent transition-colors" />
+                            </div>
+                            <p className="text-[10px] font-display uppercase tracking-widest text-white/60 group-hover:text-white transition-colors">Upload</p>
                           </button>
                         </div>
                       )}
                       <input 
                         type="file" 
-                        accept="image/*,.heic,.hevc"
+                        accept="image/*"
                         capture="environment"
                         className="hidden" 
                         ref={cameraInputRef}
                         onChange={(e) => handleImageSelect(e, 'camera')}
+                      />
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        className="hidden" 
+                        ref={galleryInputRef}
+                        onChange={(e) => handleImageSelect(e, 'gallery')}
                       />
                     </div>
 

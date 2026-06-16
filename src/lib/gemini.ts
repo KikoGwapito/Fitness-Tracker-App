@@ -25,16 +25,21 @@ export async function analyzeMeal(imagePart?: { inlineData: { data: string; mime
 
   let response;
   let lastError;
-  // Use gemini-3.5-flash for the fastest possible text and vision processing
   const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-pro-preview"];
 
   for (const modelName of modelsToTry) {
     let attempt = 0;
-    const MAX_RETRIES = 2;
+    const MAX_RETRIES = 1; // Faster failover
     let success = false;
 
     while (attempt < MAX_RETRIES) {
       try {
+        console.log(`[Gemini] Attempting analysis with ${modelName}...`);
+        
+        // Add AbortController for 15 second timeout to prevent hanging forever
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), 15000);
+        
         response = await ai.models.generateContent({
           model: modelName,
           contents: { parts },
@@ -122,21 +127,28 @@ Once the user confirms a choice or describes the meal, set status = "confirmed" 
             ]
           }
         });
+        clearTimeout(timeoutId);
         success = true;
         break; // Success, exit retry loop
       } catch (error: any) {
         attempt++;
         lastError = error;
+        
+        // Handle AbortError
+        if (error.name === 'AbortError' || (error.message && error.message.includes('abort'))) {
+           throw new Error(`The analysis took too long and timed out. The AI model might be under heavy load. Please try analyzing again!`);
+        }
+        
         const errorMessage = error instanceof Error ? error.message : String(error);
         
         // Check if it's a 503 or 429 (quota/demand) error
         if ((errorMessage.includes('503') || errorMessage.includes('429') || errorMessage.includes('high demand') || errorMessage.includes('UNAVAILABLE')) && attempt < MAX_RETRIES) {
           console.warn(`[${modelName}] API high demand. Retrying attempt ${attempt} of ${MAX_RETRIES}...`);
-          // Exponential backoff: 1s (reduced from 1.5s)
+          // Exponential backoff
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
         } else {
           // If it's not a retryable error or we're out of retries, break inner loop to try next model
-          console.warn(`[${modelName}] Failed. Moving to next model if available.`);
+          console.warn(`[${modelName}] Failed. Moving to next model if available. Error:`, errorMessage);
           break;
         }
       }
@@ -184,8 +196,11 @@ User Message: "${message}"`;
     parts: [{ text: msg.text }]
   }));
 
-  for (const modelName of modelsToTry) {
+    for (const modelName of modelsToTry) {
     try {
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 15000);
+      
       const chat = ai.chats.create({
         model: modelName,
         history: formattedHistory,
@@ -231,9 +246,13 @@ Respond ONLY in JSON format:
       });
 
       response = await chat.sendMessage({ message: prompt });
+      clearTimeout(timeoutId);
       break;
-    } catch (error) {
+    } catch (error: any) {
       lastError = error;
+      if (error.name === 'AbortError' || (error.message && error.message.includes('abort'))) {
+          throw new Error('Coach Gref took too long to respound. Please try your message again.');
+      }
       console.warn(`[${modelName}] Failed for chatWithAICoach. Trying next...`);
     }
   }
